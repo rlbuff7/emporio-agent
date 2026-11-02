@@ -24,7 +24,7 @@ def bad_request():
 def fallback_with(store_tools, primary_responses, fallback_responses):  # noqa: F811
     primary = make_primary(store_tools, *primary_responses)
     fake = FakeOpenAI(*fallback_responses)
-    agent = FallbackAgent(primary, lambda tools: CompatAgent("gemini", "fake-gemini", tools=tools, client=fake))
+    agent = FallbackAgent(primary, [lambda tools: CompatAgent("gemini", "fake-gemini", tools=tools, client=fake)])
     return agent, primary, fake
 
 
@@ -63,7 +63,7 @@ def test_fallback_down_too_raises_the_primary_error(store_tools):  # noqa: F811
         raise compat.ProviderError("Set GEMINI_API_KEY")
 
     with pytest.raises(anthropic.APIConnectionError):
-        FallbackAgent(primary, broken_factory).send("oi")
+        FallbackAgent(primary, [broken_factory]).send("oi")
     assert primary.messages == []
 
 
@@ -74,3 +74,23 @@ def test_fallback_is_configured_from_env(monkeypatch):
     assert not isinstance(make_agent("claude-haiku-5-5"), FallbackAgent)  # explicit model (evals): no fallback
     monkeypatch.delenv("EMPORIO_FALLBACK_MODEL")
     assert not isinstance(make_agent(), FallbackAgent)
+
+
+def test_chain_tries_the_next_fallback(store_tools):  # noqa: F811
+    primary = make_primary(store_tools, overloaded())
+    groq = FakeOpenAI(completion("Abrimos às 9h."))
+
+    def gemini_down(tools):
+        raise compat.ProviderError("Set GEMINI_API_KEY")
+
+    chain = [gemini_down, lambda tools: CompatAgent("groq", "fake-groq", tools=tools, client=groq)]
+    reply = FallbackAgent(primary, chain).send("que horas abre?")
+    assert reply.text == "Abrimos às 9h."
+    assert "fake-groq" in reply.flags[0] and "failed" in reply.flags[0]
+
+
+def test_chain_is_read_from_env(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.setenv("EMPORIO_FALLBACK_MODEL", "gemini:gemini-3.5-flash, groq:openai/gpt-oss-20b")
+    agent = make_agent()
+    assert [f.model for f in agent.fallback_factories] == ["gemini:gemini-3.5-flash", "groq:openai/gpt-oss-20b"]

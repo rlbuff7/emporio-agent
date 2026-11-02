@@ -230,16 +230,17 @@ def _is_outage(exc: Exception) -> bool:
 
 
 class FallbackAgent:
-    """Primary model first; if it is down or rate-limited, the same turn goes to the fallback model.
+    """Primary model first; if it is down or rate-limited, the same turn goes down a chain of
+    fallback models (e.g. Gemini, then Groq) until one answers.
 
-    The two providers keep history in different formats, so the fallback is seeded with the
-    conversation so far as plain text, and the fallback's answer is written back into the
-    primary's history. Both share one StoreTools, so tool-side limits (lockout, tickets) hold.
+    Providers keep history in different formats, so a fallback is seeded with the conversation
+    so far as plain text, and its answer is written back into the primary's history. All share
+    one StoreTools, so tool-side limits (lockout, tickets) hold across providers.
     """
 
-    def __init__(self, primary: BaseAgent, fallback_factory):
+    def __init__(self, primary: BaseAgent, fallback_factories: list):
         self.primary = primary
-        self.fallback_factory = fallback_factory  # built lazily: no key needed until an outage
+        self.fallback_factories = fallback_factories  # built lazily: no key needed until an outage
         self.provider_errors = primary.provider_errors
         self.turns: list[tuple[str, str]] = []
 
@@ -257,36 +258,54 @@ class FallbackAgent:
         except self.primary.provider_errors as exc:
             if not _is_outage(exc):
                 raise
-            try:
-                reply = self._send_to_fallback(text, reason=type(exc).__name__)
-            except Exception as fallback_exc:
-                # Fallback down too (or not configured): surface the primary's error, which callers handle.
-                raise exc from fallback_exc
+            reply = self._send_to_fallbacks(text, reason=type(exc).__name__)
+            if reply is None:
+                # Every fallback is down too (or not configured): surface the primary's error, which callers handle.
+                raise
             # Keep the primary's history complete for the next turn.
             self.primary.messages += [{"role": "user", "content": text}, {"role": "assistant", "content": reply.text}]
         self.turns.append((text, reply.text))
         return reply
 
-    def _send_to_fallback(self, text: str, reason: str) -> Reply:
-        fallback = self.fallback_factory(self.primary.tools)
-        for user, answer in self.turns:
-            fallback.messages += [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
-        fallback.known_amounts |= self.primary.known_amounts
-        reply = fallback.send(text)
-        self.primary.known_amounts |= fallback.known_amounts
-        reply.flags.insert(0, f"fallback: primary failed ({reason}), answered by {fallback.model}")
-        return reply
+    def _send_to_fallbacks(self, text: str, reason: str) -> Reply | None:
+        """Try each fallback in order; None if all of them fail."""
+        failed = [f"primary failed ({reason})"]
+        for factory in self.fallback_factories:
+            try:
+                fallback = factory(self.primary.tools)
+                for user, answer in self.turns:
+                    fallback.messages += [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
+                fallback.known_amounts |= self.primary.known_amounts
+                reply = fallback.send(text)
+            except Exception as exc:  # down, rate-limited, missing key or package: try the next one
+                failed.append(f"{getattr(factory, 'model', 'fallback')} failed ({type(exc).__name__})")
+                continue
+            self.primary.known_amounts |= fallback.known_amounts
+            reply.flags.insert(0, f"fallback: {', '.join(failed)}; answered by {fallback.model}")
+            return reply
+        return None
+
+
+class _Factory:
+    """Builds a fallback agent on demand, sharing the primary's tools."""
+
+    def __init__(self, model: str):
+        self.model = model
+
+    def __call__(self, tools: StoreTools) -> BaseAgent:
+        return _single_agent(self.model, tools)
 
 
 def make_agent(model: str | None = None, tools: StoreTools | None = None) -> BaseAgent | FallbackAgent:
     """'claude-...' -> Anthropic; 'provider:model' (e.g. 'gemini:gemini-3.5-flash') -> free provider.
 
-    With no explicit model, EMPORIO_MODEL is used, and EMPORIO_FALLBACK_MODEL (if set) adds a fallback.
+    With no explicit model, EMPORIO_MODEL is used, and EMPORIO_FALLBACK_MODEL adds a fallback chain:
+    a comma-separated list tried in order, e.g. "gemini:gemini-3.5-flash,groq:openai/gpt-oss-120b".
     """
-    fallback_model = None if model else os.environ.get("EMPORIO_FALLBACK_MODEL")
+    chain = [] if model else [m.strip() for m in os.environ.get("EMPORIO_FALLBACK_MODEL", "").split(",") if m.strip()]
     agent = _single_agent(model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL), tools)
-    if fallback_model:
-        return FallbackAgent(agent, lambda shared_tools: _single_agent(fallback_model, shared_tools))
+    if chain:
+        return FallbackAgent(agent, [_Factory(m) for m in chain])
     return agent
 
 
