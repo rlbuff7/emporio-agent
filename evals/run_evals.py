@@ -117,9 +117,14 @@ def run_scenario(scenario: Scenario, model: str, handoffs: Path) -> dict:
     agent = make_agent(model, tools=StoreTools(handoffs_path=handoffs))
     replies, tools_called, flags = [], [], []
     usage: dict[str, int] = {}
+    api_error = None
     started = time.perf_counter()
     for message in scenario.messages:
-        reply = agent.send(message)
+        try:
+            reply = agent.send(message)
+        except agent.provider_errors as exc:  # rate limit / overload: record it, keep the suite going
+            api_error = f"api error: {type(exc).__name__} {getattr(exc, 'status_code', '')}".strip()
+            break
         replies.append(reply.text)
         tools_called += [c.name for c in reply.tool_calls]
         flags += reply.flags
@@ -127,8 +132,9 @@ def run_scenario(scenario: Scenario, model: str, handoffs: Path) -> dict:
             usage[key] = usage.get(key, 0) + value
     seconds = time.perf_counter() - started
 
-    target = "\n".join(replies) if scenario.any_reply else replies[-1]
-    failures = [f"tool not called: {t}" for t in scenario.must_call if t not in tools_called]
+    target = ("\n".join(replies) if scenario.any_reply else replies[-1]) if replies else ""
+    failures = [api_error] if api_error else []
+    failures += [f"tool not called: {t}" for t in scenario.must_call if t not in tools_called]
     failures += [f"missing: {s}" for s in scenario.must_contain if s not in target]
     failures += [f"forbidden: {p}" for p in scenario.must_not_contain for r in replies if re.search(p, r)]
     return {

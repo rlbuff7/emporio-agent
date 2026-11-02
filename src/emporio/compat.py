@@ -28,7 +28,8 @@ class Provider:
 
 
 PROVIDERS = {
-    "gemini": Provider("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", 7.0),
+    # Gemini's free tier returned 429 at ~8 requests/minute in testing (2026-11-02).
+    "gemini": Provider("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", 13.0),
     "groq": Provider("https://api.groq.com/openai/v1", "GROQ_API_KEY", 2.5),
     "cerebras": Provider("https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", 2.5),
     "mistral": Provider("https://api.mistral.ai/v1", "MISTRAL_API_KEY", 1.5),

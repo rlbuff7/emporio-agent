@@ -223,9 +223,74 @@ class Agent(BaseAgent):
         ]})
 
 
-def make_agent(model: str | None = None, tools: StoreTools | None = None) -> BaseAgent:
-    """'claude-...' -> Anthropic; 'provider:model' (e.g. 'gemini:gemini-2.5-flash') -> free provider."""
-    model = model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL)
+def _is_outage(exc: Exception) -> bool:
+    """Errors worth retrying elsewhere: overload, rate limit, server error, network. Not bad keys or bad requests."""
+    status = getattr(exc, "status_code", None)
+    return status is None or status == 429 or status >= 500
+
+
+class FallbackAgent:
+    """Primary model first; if it is down or rate-limited, the same turn goes to the fallback model.
+
+    The two providers keep history in different formats, so the fallback is seeded with the
+    conversation so far as plain text, and the fallback's answer is written back into the
+    primary's history. Both share one StoreTools, so tool-side limits (lockout, tickets) hold.
+    """
+
+    def __init__(self, primary: BaseAgent, fallback_factory):
+        self.primary = primary
+        self.fallback_factory = fallback_factory  # built lazily: no key needed until an outage
+        self.provider_errors = primary.provider_errors
+        self.turns: list[tuple[str, str]] = []
+
+    @property
+    def messages(self) -> list[dict]:
+        return self.primary.messages
+
+    def reset(self) -> None:
+        self.primary.reset()
+        self.turns = []
+
+    def send(self, text: str) -> Reply:
+        try:
+            reply = self.primary.send(text)
+        except self.primary.provider_errors as exc:
+            if not _is_outage(exc):
+                raise
+            try:
+                reply = self._send_to_fallback(text, reason=type(exc).__name__)
+            except Exception as fallback_exc:
+                # Fallback down too (or not configured): surface the primary's error, which callers handle.
+                raise exc from fallback_exc
+            # Keep the primary's history complete for the next turn.
+            self.primary.messages += [{"role": "user", "content": text}, {"role": "assistant", "content": reply.text}]
+        self.turns.append((text, reply.text))
+        return reply
+
+    def _send_to_fallback(self, text: str, reason: str) -> Reply:
+        fallback = self.fallback_factory(self.primary.tools)
+        for user, answer in self.turns:
+            fallback.messages += [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
+        fallback.known_amounts |= self.primary.known_amounts
+        reply = fallback.send(text)
+        self.primary.known_amounts |= fallback.known_amounts
+        reply.flags.insert(0, f"fallback: primary failed ({reason}), answered by {fallback.model}")
+        return reply
+
+
+def make_agent(model: str | None = None, tools: StoreTools | None = None) -> BaseAgent | FallbackAgent:
+    """'claude-...' -> Anthropic; 'provider:model' (e.g. 'gemini:gemini-3.5-flash') -> free provider.
+
+    With no explicit model, EMPORIO_MODEL is used, and EMPORIO_FALLBACK_MODEL (if set) adds a fallback.
+    """
+    fallback_model = None if model else os.environ.get("EMPORIO_FALLBACK_MODEL")
+    agent = _single_agent(model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL), tools)
+    if fallback_model:
+        return FallbackAgent(agent, lambda shared_tools: _single_agent(fallback_model, shared_tools))
+    return agent
+
+
+def _single_agent(model: str, tools: StoreTools | None) -> BaseAgent:
     if ":" in model:
         from emporio.compat import CompatAgent  # optional dependency (openai package)
         provider, provider_model = model.split(":", 1)
