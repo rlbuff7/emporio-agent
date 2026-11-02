@@ -227,7 +227,12 @@ def test_dispatch_rejects_unknown_tools_and_bad_arguments(tools):
 @pytest.mark.parametrize("day, open_, hours, holiday", [
     ("2026-12-31", True, "09:00–18:00", None),                  # Thursday, not a holiday
     ("2026-12-25", False, "fechado", "Natal"),
-    ("2027-03-26", False, "fechado", "Sexta-feira Santa"),       # Easter 2027 is March 28
+    ("2027-03-26", False, "fechado", "Paixão de Cristo (Sexta-feira Santa)"),  # Easter 2027 is March 28
+    ("2026-04-03", False, "fechado", "Paixão de Cristo (Sexta-feira Santa)"),  # matches Decreto 16.469
+    ("2026-08-26", False, "fechado", "Aniversário de Campo Grande"),          # Wednesday
+    ("2027-06-14", True, "09:00–18:00", None),                  # day after Santo Antônio
+    ("2026-06-04", True, "09:00–18:00", None),                  # Corpus Christi: ponto facultativo
+    ("2026-02-16", True, "09:00–18:00", None),                  # Carnival Monday: ponto facultativo
     ("2027-10-11", False, "fechado", "Criação do Estado de Mato Grosso do Sul"),  # Monday
     ("2026-12-26", True, "09:00–13:00", None),                  # Saturday
     ("2026-12-27", False, "fechado", None),                     # Sunday
@@ -242,11 +247,29 @@ def test_easter_dates():
     assert [easter(y).isoformat() for y in (2025, 2026, 2027)] == ["2025-04-20", "2026-04-05", "2027-03-28"]
 
 
+def test_santo_antonio_closes_the_store():
+    from emporio.tools import holiday_name
+    from datetime import date
+    assert holiday_name(date(2027, 6, 13)) == "Santo Antônio, padroeiro de Campo Grande"
+
+
 def test_opening_hours_rejects_bad_dates(tools):
     assert tools.get_opening_hours("31/12")["error"] == "invalid_date"
 
 
 def test_good_friday_closes_the_store_today(tools):
     now = at(tools, 2026, 4, 3, 10, 0).get_current_datetime()  # Good Friday 2026
-    assert now["holiday"] == "Sexta-feira Santa" and now["is_open_now"] is False
+    assert now["holiday"] == "Paixão de Cristo (Sexta-feira Santa)" and now["is_open_now"] is False
     assert now["next_opening"]["date"] == "2026-04-04"
+
+
+def test_every_2026_closure_in_campo_grande_calendar():
+    """The full 2026 list (Decreto 16.469 + the two municipal holidays): the store is closed on each."""
+    from datetime import date
+    from emporio.tools import holiday_name
+    closures = ["01-01", "04-03", "04-21", "05-01", "06-13", "08-26", "09-07",
+                "10-11", "10-12", "11-02", "11-15", "11-20", "12-25"]
+    assert [d for d in closures if holiday_name(date.fromisoformat(f"2026-{d}")) is None] == []
+    pontos_facultativos = ["01-02", "02-16", "02-17", "02-18", "04-02", "04-20",
+                           "06-04", "06-05", "10-28", "12-24", "12-31"]
+    assert [d for d in pontos_facultativos if holiday_name(date.fromisoformat(f"2026-{d}"))] == []

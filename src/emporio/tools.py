@@ -37,9 +37,10 @@ WEEKDAYS_PT = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
 OPENING_HOURS = {wd: (time(9), time(18)) for wd in range(5)} | {5: (time(9), time(13))}
 
 # Holidays the store closes on (manual 2: "Domingo e Feriados: Fechado").
-# Covered: fixed-date national holidays, Good Friday (computed from Easter) and the
-# Mato Grosso do Sul state holiday. Not covered: Carnival and Corpus Christi (national
-# "ponto facultativo", not holidays) and Campo Grande municipal holidays; see README.
+# Sources: Campo Grande Decreto Municipal nº 16.469 (4/12/2025) lists the national and state
+# holidays for 2026; the two municipal holidays come from the press and the TJMS calendar (the
+# law creating them was not located). Carnival, Ash Wednesday, Corpus Christi and the 24/12 and
+# 31/12 eves are "pontos facultativos" in that decree, not holidays: the store opens.
 NATIONAL_HOLIDAYS = {
     (1, 1): "Confraternização Universal",
     (4, 21): "Tiradentes",
@@ -52,6 +53,10 @@ NATIONAL_HOLIDAYS = {
     (12, 25): "Natal",
 }
 STATE_HOLIDAYS = {(10, 11): "Criação do Estado de Mato Grosso do Sul"}
+MUNICIPAL_HOLIDAYS = {
+    (6, 13): "Santo Antônio, padroeiro de Campo Grande",
+    (8, 26): "Aniversário de Campo Grande",
+}
 
 
 def easter(year: int) -> date:
@@ -71,8 +76,9 @@ def easter(year: int) -> date:
 
 def holiday_name(day: date) -> str | None:
     if day == easter(day.year) - timedelta(days=2):
-        return "Sexta-feira Santa"
-    return NATIONAL_HOLIDAYS.get((day.month, day.day)) or STATE_HOLIDAYS.get((day.month, day.day))
+        return "Paixão de Cristo (Sexta-feira Santa)"
+    key = (day.month, day.day)
+    return NATIONAL_HOLIDAYS.get(key) or STATE_HOLIDAYS.get(key) or MUNICIPAL_HOLIDAYS.get(key)
 
 
 def hours_on(day: date) -> tuple[time, time] | None:
