@@ -10,7 +10,10 @@ Commands inside the chat: /reset (new conversation), /sair (quit).
 import argparse
 import json
 import os
+import re
+import shutil
 import sys
+import textwrap
 from pathlib import Path
 
 import anthropic
@@ -31,6 +34,23 @@ def load_dotenv(path: Path = PROJECT_ROOT / ".env") -> None:
         if line and not line.startswith("#") and "=" in line:
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+def for_terminal(text: str, width: int | None = None) -> str:
+    """Plain text wrapped to the terminal width.
+
+    Markdown emphasis (**x**, __x__) is removed: a chat terminal shows it as literal asterisks.
+    Long lines are wrapped because the Windows console misplaces the input cursor after a
+    line the terminal had to wrap itself.
+    """
+    text = re.sub(r"(\*\*|__)(.+?)\1", r"\2", text)
+    width = (width or shutil.get_terminal_size().columns) - 1
+    wrapped = []
+    for line in text.splitlines():
+        bullet = re.match(r"\s*(?:[-*•]|\d+[.)])\s+", line)
+        indent = " " * len(bullet.group(0)) if bullet else ""
+        wrapped.append(textwrap.fill(line, width=width, subsequent_indent=indent) if line.strip() else "")
+    return "\n".join(wrapped)
 
 
 def format_tool_calls(reply: Reply) -> list[str]:
@@ -109,7 +129,7 @@ def main() -> None:
             tool_lines = format_tool_calls(reply)
             if args.debug:
                 print("\n".join(tool_lines))
-            print(f"Empório da Música: {reply.text}\n")
+            print(for_terminal(f"Empório da Música: {reply.text}") + "\n")
             turns.append((user, reply.text, tool_lines))
     except KeyboardInterrupt:
         print()
