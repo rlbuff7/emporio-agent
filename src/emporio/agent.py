@@ -16,7 +16,7 @@ from emporio.prompts import build_system_prompt
 from emporio.tool_schemas import TOOL_SCHEMAS
 from emporio.tools import StoreTools
 
-DEFAULT_MODEL = "claude-sonnet-5-5"
+DEFAULT_MODEL = "claude-haiku-5-5"  # cheap and fast; set EMPORIO_MODEL=claude-sonnet-5-5 for stronger reasoning
 DEFAULT_EFFORT = "medium"  # multi-step tool use in a chat; "low" is cheaper and faster
 MAX_TOKENS = 16000
 MAX_TOOL_ROUNDS = 5
