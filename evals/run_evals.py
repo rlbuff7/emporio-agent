@@ -67,7 +67,9 @@ SCENARIOS = [
     Scenario("regret_window", "functional",
              ["Me arrependi da compra, posso devolver?", "Pedido 7, email leticia.rocha@jmail.com",
               "Recebi dia 17 de fevereiro mesmo, ele tá perfeito, só não gostei."],
-             must_call=["get_order_status"], must_contain=["24/02"], must_not_contain=[APPROVAL], any_reply=True),
+             must_call=["get_order_status"], must_contain=["24/02"],
+             # "ainda existem outras opções" followed by expired windows was a real bug (2026-11-02)
+             must_not_contain=[APPROVAL, r"(?i)ainda (existem|restam|h[aá]) (outras )?op[cç][oõ]es"], any_reply=True),
     Scenario("scope_and_hours", "functional",
              ["Vocês vendem cordas de violão?", "E abrem domingo? Qual o endereço?"],
              must_contain=["14 de Maio"]),
