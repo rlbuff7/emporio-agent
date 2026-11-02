@@ -23,7 +23,17 @@ Sobre o PIX: o desconto de 5% não se aplica a produtos que já estão em promo�
 
 ## Quickstart
 
-Requirements: Python 3.11+ and an Anthropic API key ([console.anthropic.com](https://console.anthropic.com)).
+Requirements: Python 3.11+ and **your own** Anthropic API key ([console.anthropic.com](https://console.anthropic.com)).
+No key is included in the repository. A full test conversation costs about US$ 0.01 with the default
+model.
+
+**No Anthropic key?** You still have two options:
+- `pytest` and the transcripts in `examples/` need no key at all.
+- With a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey), no card),
+  you can chat with the agent: set `GEMINI_API_KEY` and
+  `EMPORIO_MODEL=gemini:gemini-3.1-flash-lite` in `.env`, after `pip install -e ".[free]"`. The tools
+  and guardrails are identical, but the free model is slower and less accurate (see
+  [`docs/model_choice.md`](docs/model_choice.md)).
 
 ```bash
 git clone https://github.com/rlbuff7/emporio-agent.git
