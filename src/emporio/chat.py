@@ -34,7 +34,7 @@ def load_dotenv(path: Path = PROJECT_ROOT / ".env") -> None:
 
 
 def format_tool_calls(reply: Reply) -> list[str]:
-    lines = []
+    lines = [f"  [guardrail] {flag}" for flag in reply.flags]
     for call in reply.tool_calls:
         result = json.dumps(call.result, ensure_ascii=False)
         if len(result) > 300:

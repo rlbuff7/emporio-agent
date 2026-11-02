@@ -162,6 +162,25 @@ def _window(start: date, days: int, today: date) -> dict:
 
 # --- tools -------------------------------------------------------------------
 
+TOOL_NAMES = {
+    "search_products",
+    "get_product",
+    "get_active_promotions",
+    "get_order_status",
+    "get_current_datetime",
+    "escalate_to_human",
+}
+
+# Per-session abuse limits (one StoreTools instance per customer session).
+MAX_FAILED_VERIFICATIONS = 3  # stops guessing e-mails/phones until one matches
+MAX_TICKETS_PER_SESSION = 3   # stops flooding the human queue
+
+VERIFICATION_LOCKED = {
+    "error": "verification_locked",
+    "message": "Muitas tentativas de verificação nesta conversa. Um atendente precisa ajudar com este pedido.",
+}
+
+
 class StoreTools:
     """The agent's tools. Paths and clock are injectable so tests are deterministic."""
 
@@ -174,14 +193,15 @@ class StoreTools:
         self.db_path = db_path
         self.handoffs_path = handoffs_path
         self.clock = clock
+        self.failed_verifications = 0
+        self.tickets_opened = 0
 
     def call(self, name: str, arguments: dict) -> dict:
-        """Dispatch a tool call from the model. Unknown tools and bad arguments become errors, not crashes."""
-        method = getattr(self, name, None)
-        if name.startswith("_") or name == "call" or not callable(method):
+        """Dispatch a tool call from the model. Only whitelisted tools run; bad arguments become errors, not crashes."""
+        if name not in TOOL_NAMES:
             return {"error": "unknown_tool", "message": f"Tool '{name}' does not exist."}
         try:
-            return method(**arguments)
+            return getattr(self, name)(**arguments)
         except (TypeError, ValueError) as exc:
             return {"error": "invalid_arguments", "message": str(exc)}
 
@@ -287,7 +307,10 @@ class StoreTools:
 
     def get_order_status(self, order_id: int | str, email_or_phone: str) -> dict:
         """Order details, only if the e-mail or phone belongs to the order's customer (LGPD)."""
+        if self.failed_verifications >= MAX_FAILED_VERIFICATIONS:
+            return VERIFICATION_LOCKED
         if not str(order_id).strip().isdigit():
+            self.failed_verifications += 1
             return VERIFICATION_FAILED
         with closing(connect(self.db_path)) as conn:
             order = conn.execute(
@@ -301,6 +324,7 @@ class StoreTools:
             # Same answer whether the order is missing or the contact is wrong:
             # never reveal which part failed.
             if order is None or not _identity_matches(email_or_phone, order["email"], order["phone"]):
+                self.failed_verifications += 1
                 return VERIFICATION_FAILED
             items = conn.execute(
                 """
@@ -383,6 +407,12 @@ class StoreTools:
         customer_contact: str | None = None,
     ) -> dict:
         """Open a ticket for the human team (complaints, exchanges, warranty, anything the bot must not decide)."""
+        if self.tickets_opened >= MAX_TICKETS_PER_SESSION:
+            return {
+                "error": "ticket_limit",
+                "message": "Já existem chamados abertos nesta conversa; a equipe vai tratar todos juntos.",
+            }
+        self.tickets_opened += 1
         self.handoffs_path.parent.mkdir(parents=True, exist_ok=True)
         existing = self.handoffs_path.read_text(encoding="utf-8").splitlines() if self.handoffs_path.exists() else []
         ticket = f"EMP-{len(existing) + 1:04d}"

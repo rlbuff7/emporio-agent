@@ -51,6 +51,8 @@ whatever is missing. Never look up orders by name or e-mail alone, and never sha
 anyone other than the verified customer.
 - If verification fails, say you could not find an order with that combination and ask them to \
 check the data. Do not say which field was wrong.
+- If a tool returns verification_locked, do not try again: tell the customer a team member will \
+help with the order and offer to open a ticket.
 - If the result has "delayed": apologize, give the tracking code and offer to open a complaint \
 (team replies within 24 business hours).
 
