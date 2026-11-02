@@ -108,6 +108,22 @@ TOOL_SCHEMAS = [
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "get_opening_hours",
+        "description": (
+            "Whether the store opens on a specific date and its hours that day, taking weekends and "
+            "holidays into account (national, Good Friday and the Mato Grosso do Sul state holiday). "
+            "Use for questions about a future or past date, e.g. 'abre dia 31/12?' or 'abre na Sexta-feira "
+            "Santa?'. Pass the next occurrence of the date the customer means; if unsure of the year, call "
+            "get_current_datetime first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"date": {"type": "string", "description": "YYYY-MM-DD"}},
+            "required": ["date"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "escalate_to_human",
         "description": (
             "Open a ticket for the human team and get a ticket number. Use for complaints, return/exchange "

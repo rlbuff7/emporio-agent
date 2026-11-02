@@ -9,7 +9,7 @@ import httpx2
 import pytest
 
 from emporio.agent import FALLBACK_REPLY, MAX_TOOL_ROUNDS, Agent
-from emporio.tools import STORE_TZ, StoreTools
+from emporio.tools import STORE_TZ, TOOL_NAMES, StoreTools
 
 
 def text(value):
@@ -91,10 +91,8 @@ def test_request_carries_system_prompt_tools_and_settings(store_tools):
     agent.send("oi")
     request = agent.client.requests[0]
     assert "<manual>" in request["system"] and "Brazilian Portuguese" in request["system"]
-    assert {t["name"] for t in request["tools"]} == {
-        "search_products", "get_product", "get_active_promotions",
-        "get_order_status", "get_current_datetime", "escalate_to_human",
-    }
+    # Every schema sent to the model has a whitelisted implementation, and vice versa.
+    assert {t["name"] for t in request["tools"]} == TOOL_NAMES
     assert request["model"] == "test-model"
     assert request["output_config"] == {"effort": "low"}
 

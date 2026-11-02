@@ -36,8 +36,10 @@ WEEKDAYS_PT = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
 # Manual 2: Mon-Fri 09:00-18:00, Sat 09:00-13:00, Sun and holidays closed.
 OPENING_HOURS = {wd: (time(9), time(18)) for wd in range(5)} | {5: (time(9), time(13))}
 
-# Fixed-date national holidays. Movable ones (Carnaval, Good Friday, Corpus Christi)
-# and municipal holidays are not covered; see README limitations.
+# Holidays the store closes on (manual 2: "Domingo e Feriados: Fechado").
+# Covered: fixed-date national holidays, Good Friday (computed from Easter) and the
+# Mato Grosso do Sul state holiday. Not covered: Carnival and Corpus Christi (national
+# "ponto facultativo", not holidays) and Campo Grande municipal holidays; see README.
 NATIONAL_HOLIDAYS = {
     (1, 1): "Confraternização Universal",
     (4, 21): "Tiradentes",
@@ -49,6 +51,33 @@ NATIONAL_HOLIDAYS = {
     (11, 20): "Dia da Consciência Negra",
     (12, 25): "Natal",
 }
+STATE_HOLIDAYS = {(10, 11): "Criação do Estado de Mato Grosso do Sul"}
+
+
+def easter(year: int) -> date:
+    """Easter Sunday (Gregorian calendar, anonymous algorithm)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = (h + l - 7 * m + 114) % 31 + 1
+    return date(year, month, day)
+
+
+def holiday_name(day: date) -> str | None:
+    if day == easter(day.year) - timedelta(days=2):
+        return "Sexta-feira Santa"
+    return NATIONAL_HOLIDAYS.get((day.month, day.day)) or STATE_HOLIDAYS.get((day.month, day.day))
+
+
+def hours_on(day: date) -> tuple[time, time] | None:
+    """Opening and closing time on a given day, or None if the store is closed."""
+    return None if holiday_name(day) else OPENING_HOURS.get(day.weekday())
 
 # Manual 4.1, 4.2 and 8.1, in calendar days.
 REGRET_DAYS = 7
@@ -168,6 +197,7 @@ TOOL_NAMES = {
     "get_active_promotions",
     "get_order_status",
     "get_current_datetime",
+    "get_opening_hours",
     "escalate_to_human",
 }
 
@@ -375,24 +405,40 @@ class StoreTools:
         """Current date/time in Campo Grande and whether the store is open (manual 2)."""
         now = self.clock().astimezone(STORE_TZ)
         today = now.date()
-        holiday = NATIONAL_HOLIDAYS.get((today.month, today.day))
-        hours = None if holiday else OPENING_HOURS.get(today.weekday())
+        hours = hours_on(today)
         is_open = bool(hours) and hours[0] <= now.time() < hours[1]
         return {
             "date": today.isoformat(),
             "time": now.strftime("%H:%M"),
             "weekday": WEEKDAYS_PT[today.weekday()],
-            "holiday": holiday,
+            "holiday": holiday_name(today),
             "today_hours": f"{hours[0]:%H:%M}–{hours[1]:%H:%M}" if hours else "fechado",
             "is_open_now": is_open,
             "next_opening": None if is_open else self._next_opening(now),
         }
 
+    def get_opening_hours(self, date: str) -> dict:
+        """Whether the store opens on a given date (YYYY-MM-DD) and its hours that day (manual 2)."""
+        try:
+            day = datetime.strptime(str(date).strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "invalid_date", "message": "Use the format YYYY-MM-DD, e.g. 2026-12-31."}
+        hours = hours_on(day)
+        return {
+            "date": day.isoformat(),
+            "weekday": WEEKDAYS_PT[day.weekday()],
+            "holiday": holiday_name(day),
+            "open": bool(hours),
+            "hours": f"{hours[0]:%H:%M}–{hours[1]:%H:%M}" if hours else "fechado",
+            # Manual 2: hours may be extended on special dates and are announced in advance.
+            "note": "Em datas especiais o horário pode ser estendido; mudanças são avisadas nas redes sociais e no WhatsApp.",
+        }
+
     def _next_opening(self, now: datetime) -> dict:
         for offset in range(0, 8):
             day = now.date() + timedelta(days=offset)
-            hours = OPENING_HOURS.get(day.weekday())
-            if not hours or (day.month, day.day) in NATIONAL_HOLIDAYS:
+            hours = hours_on(day)
+            if not hours:
                 continue
             opening = datetime.combine(day, hours[0], STORE_TZ)
             if opening > now:

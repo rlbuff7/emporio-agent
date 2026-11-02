@@ -220,3 +220,33 @@ def test_dispatch_rejects_unknown_tools_and_bad_arguments(tools):
     assert tools.call("_rows", {})["error"] == "unknown_tool"
     assert tools.call("get_product", {"wrong": 1})["error"] == "invalid_arguments"
     assert tools.call("get_product", {"name_or_id": "95"})["product_id"] == 95
+
+
+# Opening hours on any date (manual 2) ----------------------------------------------
+
+@pytest.mark.parametrize("day, open_, hours, holiday", [
+    ("2026-12-31", True, "09:00–18:00", None),                  # Thursday, not a holiday
+    ("2026-12-25", False, "fechado", "Natal"),
+    ("2027-03-26", False, "fechado", "Sexta-feira Santa"),       # Easter 2027 is March 28
+    ("2027-10-11", False, "fechado", "Criação do Estado de Mato Grosso do Sul"),  # Monday
+    ("2026-12-26", True, "09:00–13:00", None),                  # Saturday
+    ("2026-12-27", False, "fechado", None),                     # Sunday
+])
+def test_opening_hours_on_any_date(tools, day, open_, hours, holiday):
+    result = tools.get_opening_hours(day)
+    assert (result["open"], result["hours"], result["holiday"]) == (open_, hours, holiday)
+
+
+def test_easter_dates():
+    from emporio.tools import easter
+    assert [easter(y).isoformat() for y in (2025, 2026, 2027)] == ["2025-04-20", "2026-04-05", "2027-03-28"]
+
+
+def test_opening_hours_rejects_bad_dates(tools):
+    assert tools.get_opening_hours("31/12")["error"] == "invalid_date"
+
+
+def test_good_friday_closes_the_store_today(tools):
+    now = at(tools, 2026, 4, 3, 10, 0).get_current_datetime()  # Good Friday 2026
+    assert now["holiday"] == "Sexta-feira Santa" and now["is_open_now"] is False
+    assert now["next_opening"]["date"] == "2026-04-04"
