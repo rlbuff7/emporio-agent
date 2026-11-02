@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "Customer-service agent for Empório da Música (Artefact AI Engineer challenge)"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=0.40",
+    "anthropic>=2.3",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "openai>=1.40"]
+free = ["openai>=1.40"]  # only for comparing free providers (emporio/compat.py)
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import anthropic
 
-from emporio.agent import Agent, Reply
+from emporio.agent import ProviderError, Reply, make_agent
 from emporio.etl import build_database
 from emporio.paths import DB_PATH, PROJECT_ROOT
 
@@ -67,7 +67,10 @@ def main() -> None:
     if not DB_PATH.exists():
         build_database()
 
-    agent = Agent()
+    try:
+        agent = make_agent()  # EMPORIO_MODEL picks Anthropic (default) or a free provider
+    except ProviderError as exc:
+        sys.exit(str(exc))
     turns: list[tuple[str, str, list[str]]] = []
     print(GREETING)
     print("(comandos: /reset para recomeçar, /sair para encerrar)\n")
@@ -99,6 +102,9 @@ def main() -> None:
                 continue
             except anthropic.APIStatusError as exc:
                 print(f"(erro da API {exc.status_code}: {exc.message})\n")
+                continue
+            except agent.provider_errors as exc:  # free providers (OpenAI-compatible SDK)
+                print(f"(erro da API: {exc})\n")
                 continue
             tool_lines = format_tool_calls(reply)
             if args.debug:

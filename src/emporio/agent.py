@@ -1,10 +1,10 @@
-"""The tool-calling loop, written directly on the Anthropic SDK.
+"""The tool-calling loop.
 
-One ``Agent`` holds one conversation. ``send`` runs: input check -> model call ->
-execute requested tools -> return results -> repeat, until the model answers in text
--> output check. The full assistant content (including thinking and tool_use blocks)
-is appended to the history every time, as the API requires. See emporio.guardrails
-for the input and output layers.
+``BaseAgent`` holds one conversation and the provider-independent flow:
+input check -> model call -> run requested tools -> repeat -> output check
+(see emporio.guardrails). Subclasses only translate to a provider's API:
+``Agent`` uses the Anthropic SDK directly; ``emporio.compat.CompatAgent`` speaks
+the OpenAI-compatible format used by free providers (Gemini, Groq, Cerebras...).
 """
 
 import json
@@ -19,7 +19,7 @@ from emporio.prompts import build_system_prompt
 from emporio.tool_schemas import TOOL_SCHEMAS
 from emporio.tools import StoreTools
 
-DEFAULT_MODEL = "claude-haiku-5-5"  # cheap and fast; set EMPORIO_MODEL=claude-sonnet-5-5 for stronger reasoning
+DEFAULT_MODEL = "claude-haiku-5-5"  # cheap and fast; see docs/model_choice.md
 DEFAULT_EFFORT = "medium"  # multi-step tool use in a chat; "low" is cheaper and faster
 MAX_TOKENS = 16000
 MAX_TOOL_ROUNDS = 5
@@ -44,23 +44,28 @@ class Reply:
     flags: list[str] = field(default_factory=list)  # guardrail events, shown in --debug
     usage: dict[str, int] = field(default_factory=dict)  # tokens summed over the turn's API calls
 
-    def add_usage(self, usage) -> None:
-        for name in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
-            self.usage[name] = self.usage.get(name, 0) + (getattr(usage, name, 0) or 0)
+    def add_usage(self, **tokens: int | None) -> None:
+        for name, value in tokens.items():
+            self.usage[name] = self.usage.get(name, 0) + (value or 0)
 
 
-class Agent:
-    def __init__(
-        self,
-        client: anthropic.Anthropic | None = None,
-        tools: StoreTools | None = None,
-        model: str | None = None,
-        effort: str | None = None,
-    ):
-        self.client = client or anthropic.Anthropic()
+@dataclass
+class Step:
+    """One model response, in provider-neutral form."""
+    text: str
+    tool_requests: list[tuple[str, str, dict | None]]  # (call id, tool name, arguments or None if unparsable)
+    refused: bool = False
+
+
+class ProviderError(RuntimeError):
+    """An API failure from a provider; the turn was rolled back and can be retried."""
+
+
+class BaseAgent:
+    provider_errors: tuple[type[Exception], ...] = ()
+
+    def __init__(self, tools: StoreTools | None = None):
         self.tools = tools or StoreTools()
-        self.model = model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL)
-        self.effort = effort or os.environ.get("EMPORIO_EFFORT", DEFAULT_EFFORT)
         self.system = build_system_prompt()
         self.reset()
 
@@ -75,10 +80,25 @@ class Agent:
         known = set(self.known_amounts)
         try:
             return self._turn(text)
-        except anthropic.APIError:
+        except self.provider_errors:
             del self.messages[checkpoint:]
             self.known_amounts = known
             raise
+
+    # Provider adapters implement these -------------------------------------------
+
+    def _call(self, reply: Reply) -> Step:
+        """Call the model with self.messages, append its response to self.messages, return it."""
+        raise NotImplementedError
+
+    def _add_tool_results(self, results: list[tuple[str, str, dict]]) -> None:
+        raise NotImplementedError
+
+    def _add_note(self, text: str) -> None:
+        """Operator note for the model inside the conversation (not shown to the customer)."""
+        self.messages.append({"role": "system", "content": text})
+
+    # Provider-independent flow ------------------------------------------------------
 
     def _turn(self, text: str) -> Reply:
         reply = Reply(text="")
@@ -93,38 +113,27 @@ class Agent:
         self.known_amounts |= guardrails.numbers_in_text(text)
         if check.suspicious:
             reply.flags.append("input_suspicious: injection reminder added")
-            self.messages.append({"role": "system", "content": guardrails.INJECTION_REMINDER})
+            self._add_note(guardrails.INJECTION_REMINDER)
 
         tool_rounds = 0
         retried = False
         while True:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=MAX_TOKENS,
-                system=self.system,
-                tools=TOOL_SCHEMAS,
-                messages=self.messages,
-                output_config={"effort": self.effort},
-                cache_control={"type": "ephemeral"},  # system prompt + tools are static
-            )
-            reply.add_usage(getattr(response, "usage", None))
-            if response.stop_reason == "refusal":
+            step = self._call(reply)
+            if step.refused:
                 return self._give_up(reply)
-            self.messages.append({"role": "assistant", "content": response.content})
 
-            if response.stop_reason == "tool_use":
+            if step.tool_requests:
                 # Layer 2 lives inside the tools themselves.
-                self.messages.append({"role": "user", "content": self._run_tools(response.content, reply)})
+                self._add_tool_results(self._run_tools(step.tool_requests, reply))
                 tool_rounds += 1
                 if tool_rounds > MAX_TOOL_ROUNDS:
                     return self._give_up(reply)
                 continue
 
-            answer = "".join(b.text for b in response.content if b.type == "text").strip()
             # Layer 3: output.
-            problems = guardrails.check_output(answer, self.known_amounts)
+            problems = guardrails.check_output(step.text, self.known_amounts)
             if not problems:
-                reply.text = answer or FALLBACK_REPLY
+                reply.text = step.text or FALLBACK_REPLY
                 return reply
             reply.flags.extend(f"output_rejected: {p}" for p in problems)
             if retried:
@@ -135,25 +144,18 @@ class Agent:
             if self.messages[-1]["role"] == "system":  # injection reminder from this turn
                 self.messages[-1]["content"] += "\n\n" + correction
             else:
-                self.messages.append({"role": "system", "content": correction})
+                self._add_note(correction)
 
-    def _run_tools(self, content: list, reply: Reply) -> list[dict]:
-        """Execute every tool_use block and return all results in one user message."""
+    def _run_tools(self, requests: list[tuple[str, str, dict | None]], reply: Reply) -> list[tuple[str, str, dict]]:
         results = []
-        for block in content:
-            if block.type != "tool_use":
-                continue
-            arguments = dict(block.input)
-            result = self.tools.call(block.name, arguments)
-            reply.tool_calls.append(ToolCall(block.name, arguments, result))
+        for call_id, name, arguments in requests:
+            if arguments is None:
+                result = {"error": "invalid_arguments", "message": "Arguments were not valid JSON."}
+            else:
+                result = self.tools.call(name, arguments)
+            reply.tool_calls.append(ToolCall(name, arguments or {}, result))
             self.known_amounts |= guardrails.numbers_in_result(result)
-            results.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
-                "content": json.dumps(result, ensure_ascii=False),
-                # Only malformed calls are errors; "not found" or "verification failed" are answers.
-                "is_error": result.get("error") in ("unknown_tool", "invalid_arguments"),
-            })
+            results.append((call_id, name, result))
         return results
 
     def _give_up(self, reply: Reply) -> Reply:
@@ -161,3 +163,71 @@ class Agent:
         self.messages.append({"role": "assistant", "content": FALLBACK_REPLY})
         reply.text = FALLBACK_REPLY
         return reply
+
+
+class Agent(BaseAgent):
+    """Anthropic Messages API, called directly through the official SDK."""
+
+    provider_errors = (anthropic.APIError,)
+
+    def __init__(
+        self,
+        client: anthropic.Anthropic | None = None,
+        tools: StoreTools | None = None,
+        model: str | None = None,
+        effort: str | None = None,
+    ):
+        self.client = client or anthropic.Anthropic()
+        self.model = model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL)
+        self.effort = effort or os.environ.get("EMPORIO_EFFORT", DEFAULT_EFFORT)
+        super().__init__(tools)
+
+    def _call(self, reply: Reply) -> Step:
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=MAX_TOKENS,
+            system=self.system,
+            tools=TOOL_SCHEMAS,
+            messages=self.messages,
+            output_config={"effort": self.effort},
+            cache_control={"type": "ephemeral"},  # system prompt + tools are static
+        )
+        usage = getattr(response, "usage", None)
+        reply.add_usage(
+            input_tokens=getattr(usage, "input_tokens", 0),
+            output_tokens=getattr(usage, "output_tokens", 0),
+            cache_read_input_tokens=getattr(usage, "cache_read_input_tokens", 0),
+            cache_creation_input_tokens=getattr(usage, "cache_creation_input_tokens", 0),
+        )
+        if response.stop_reason == "refusal":
+            return Step(text="", tool_requests=[], refused=True)
+        # The full content (thinking, text, tool_use) goes back into the history, as the API requires.
+        self.messages.append({"role": "assistant", "content": response.content})
+        requests = []
+        if response.stop_reason == "tool_use":
+            requests = [(b.id, b.name, dict(b.input)) for b in response.content if b.type == "tool_use"]
+        text = "".join(b.text for b in response.content if b.type == "text").strip()
+        return Step(text=text, tool_requests=requests)
+
+    def _add_tool_results(self, results: list[tuple[str, str, dict]]) -> None:
+        # All results in one user message, so the model keeps making parallel calls.
+        self.messages.append({"role": "user", "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": call_id,
+                "content": json.dumps(result, ensure_ascii=False),
+                # Only malformed calls are errors; "not found" or "verification failed" are answers.
+                "is_error": result.get("error") in ("unknown_tool", "invalid_arguments"),
+            }
+            for call_id, _, result in results
+        ]})
+
+
+def make_agent(model: str | None = None, tools: StoreTools | None = None) -> BaseAgent:
+    """'claude-...' -> Anthropic; 'provider:model' (e.g. 'gemini:gemini-2.5-flash') -> free provider."""
+    model = model or os.environ.get("EMPORIO_MODEL", DEFAULT_MODEL)
+    if ":" in model:
+        from emporio.compat import CompatAgent  # optional dependency (openai package)
+        provider, provider_model = model.split(":", 1)
+        return CompatAgent(provider, provider_model, tools=tools)
+    return Agent(model=model, tools=tools)

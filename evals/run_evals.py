@@ -3,11 +3,13 @@
     python evals/run_evals.py                          # default model
     python evals/run_evals.py claude-sonnet-5-5        # any model id
     python evals/run_evals.py claude-haiku-5-5 --only catalog lgpd
+    python evals/run_evals.py gemini:gemini-2.5-flash  # free provider, see emporio/compat.py
 
 Each scenario is a list of customer messages plus checks on the final state:
 which tools ran, what the replies contain, and what they must never contain.
 Results (pass/fail per check, latency, tokens, estimated cost) are written to
-evals/results/<model>.json. This calls the API and costs real money (cents).
+evals/results/<model>.json. Anthropic models cost real money (cents per run);
+free providers cost nothing but are rate-limited, so runs are slower.
 """
 
 import argparse
@@ -20,7 +22,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from emporio.agent import DEFAULT_MODEL, Agent
+from emporio.agent import DEFAULT_MODEL, make_agent
 from emporio.chat import load_dotenv
 from emporio.tools import StoreTools
 
@@ -112,7 +114,7 @@ SCENARIOS = [
 
 
 def run_scenario(scenario: Scenario, model: str, handoffs: Path) -> dict:
-    agent = Agent(tools=StoreTools(handoffs_path=handoffs), model=model)
+    agent = make_agent(model, tools=StoreTools(handoffs_path=handoffs))
     replies, tools_called, flags = [], [], []
     usage: dict[str, int] = {}
     started = time.perf_counter()
@@ -188,7 +190,7 @@ def main() -> None:
     }
     print(json.dumps(summary, indent=2))
     RESULTS_DIR.mkdir(exist_ok=True)
-    out = RESULTS_DIR / f"{model}.json"
+    out = RESULTS_DIR / f"{model.replace(':', '__').replace('/', '_')}.json"
     out.write_text(json.dumps({"summary": summary, "results": results}, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved {out}")
 
