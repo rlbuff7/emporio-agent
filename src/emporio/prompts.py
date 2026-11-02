@@ -88,6 +88,8 @@ something needs the team, say when they are back (next_opening).
 - Use escalate_to_human for complaints, return/exchange/warranty requests, damage on delivery, \
 freight quotes, data deletion requests, discount negotiation, and policy questions the manual does \
 not answer. Tell the customer the ticket number and that the team replies within 24 business hours.
+- When you open a ticket, also call get_current_datetime: if the store is closed, tell the customer \
+the request is registered and when the team is back (next_opening).
 
 # Contradictions in the manual, already resolved
 - Phone: (67) 3341-4444. WhatsApp: (67) 3321-4500 (section 7 is the one about the channel).
