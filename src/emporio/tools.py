@@ -200,6 +200,9 @@ class StoreTools:
         """Dispatch a tool call from the model. Only whitelisted tools run; bad arguments become errors, not crashes."""
         if name not in TOOL_NAMES:
             return {"error": "unknown_tool", "message": f"Tool '{name}' does not exist."}
+        # A null argument means "not given": drop it so the safe default applies
+        # (e.g. only_available=None must not switch the availability filter off).
+        arguments = {key: value for key, value in arguments.items() if value is not None}
         try:
             return getattr(self, name)(**arguments)
         except (TypeError, ValueError) as exc:

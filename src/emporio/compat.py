@@ -42,13 +42,27 @@ MODEL_MIN_SECONDS = {"gemini-3.1-flash-lite": 4.5}
 # Last request time per provider and model, shared by every agent in the process (evals create many).
 _last_call: dict[str, float] = {}
 
+def _nullable_optionals(schema: dict) -> dict:
+    """Let optional parameters be null. Some models send null for arguments they skip, and Groq
+    validates calls server-side, rejecting the request (HTTP 400) unless the schema allows it."""
+    required = set(schema.get("required", []))
+    properties = {}
+    for name, spec in schema.get("properties", {}).items():
+        if name not in required and "type" in spec:
+            spec = {**spec, "type": [spec["type"], "null"]}
+            if "enum" in spec:
+                spec["enum"] = [*spec["enum"], None]
+        properties[name] = spec
+    return {**schema, "properties": properties}
+
+
 OPENAI_TOOLS = [
     {
         "type": "function",
         "function": {
             "name": tool["name"],
             "description": tool["description"],
-            "parameters": tool["input_schema"],
+            "parameters": _nullable_optionals(tool["input_schema"]),
         },
     }
     for tool in TOOL_SCHEMAS

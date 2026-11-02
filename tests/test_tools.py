@@ -207,6 +207,14 @@ def test_escalation_writes_numbered_tickets(tools):
     assert records[0]["order_id"] == 8 and records[1]["reason"] == "warranty"
 
 
+def test_null_arguments_fall_back_to_safe_defaults(tools):
+    result = tools.call("search_products", {"category": "Violões", "only_available": None, "query": None})
+    assert result["total_found"] > 0
+    assert all(p["available"] for p in result["products"])  # filter stayed on
+    ticket = tools.call("escalate_to_human", {"reason": "other", "summary": "x", "order_id": None})
+    assert "ticket" in ticket
+
+
 def test_dispatch_rejects_unknown_tools_and_bad_arguments(tools):
     assert tools.call("drop_tables", {})["error"] == "unknown_tool"
     assert tools.call("_rows", {})["error"] == "unknown_tool"

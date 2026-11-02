@@ -68,6 +68,14 @@ def test_tools_are_sent_in_openai_format(store_tools):  # noqa: F811
     assert all(t["type"] == "function" and "properties" in t["function"]["parameters"] for t in tools)
 
 
+def test_optional_parameters_accept_null_for_strict_providers():
+    escalate = next(t["function"]["parameters"] for t in compat.OPENAI_TOOLS if t["function"]["name"] == "escalate_to_human")
+    assert escalate["properties"]["order_id"]["type"] == ["integer", "null"]
+    assert escalate["properties"]["reason"]["type"] == "string"  # required: unchanged
+    search = next(t["function"]["parameters"] for t in compat.OPENAI_TOOLS if t["function"]["name"] == "search_products")
+    assert None in search["properties"]["strings"]["enum"]
+
+
 def test_unparsable_arguments_become_tool_error(store_tools):  # noqa: F811
     agent = make(store_tools, completion(tool_calls=[("get_product", "{not json")]), completion("Desculpa!"))
     reply = agent.send("x")
