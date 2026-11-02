@@ -63,7 +63,10 @@ class CompatAgent(BaseAgent):
         api_key = os.environ.get(self.provider.key_env)
         if client is None and not api_key:
             raise ProviderError(f"Set {self.provider.key_env} in .env to use {provider}.")
-        self.client = client or openai.OpenAI(api_key=api_key, base_url=self.provider.base_url, max_retries=5)
+        # Few retries and a firm timeout: free tiers return 503/429 often, and a stuck call should fail fast.
+        self.client = client or openai.OpenAI(
+            api_key=api_key, base_url=self.provider.base_url, max_retries=2, timeout=90
+        )
         super().__init__(tools)
 
     def _add_note(self, text: str) -> None:
@@ -92,11 +95,7 @@ class CompatAgent(BaseAgent):
         calls = message.tool_calls or []
         assistant = {"role": "assistant", "content": message.content or ""}
         if calls:
-            assistant["tool_calls"] = [
-                {"id": c.id, "type": "function",
-                 "function": {"name": c.function.name, "arguments": c.function.arguments or "{}"}}
-                for c in calls
-            ]
+            assistant["tool_calls"] = [_dump_call(c) for c in calls]
         self.messages.append(assistant)
         return Step(
             text=(message.content or "").strip(),
@@ -110,6 +109,15 @@ class CompatAgent(BaseAgent):
                 "tool_call_id": call_id,
                 "content": json.dumps(result, ensure_ascii=False),
             })
+
+
+def _dump_call(call) -> dict:
+    """The tool call exactly as the provider sent it. Gemini 3 adds a thought_signature in
+    extra_content and rejects the next request (HTTP 400) if it is not sent back."""
+    if hasattr(call, "model_dump"):
+        return call.model_dump(exclude_none=True)
+    return {"id": call.id, "type": "function",
+            "function": {"name": call.function.name, "arguments": call.function.arguments or "{}"}}
 
 
 def _parse_arguments(raw: str | None) -> dict | None:
