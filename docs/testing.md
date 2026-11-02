@@ -5,7 +5,7 @@ three levels:
 
 | Level | What | How to run | Cost |
 |---|---|---|---|
-| Unit and integration | 102 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
+| Unit and integration | 118 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
 | Live evals | 18 scripted conversations (7 functional, 11 adversarial) graded in code | `python evals/run_evals.py <model>` | ~US$ 0.02 per run on Haiku |
 | Manual | A person chatting with the CLI, looking for anything that reads wrong to a customer | `python -m emporio.chat --debug --save <file>.md` | ~US$ 0.001 per message on Haiku |
 
@@ -24,6 +24,7 @@ also became a test or an eval check.
 | 6 | **Manual (CLI)** | "Me arrependi da compra do pedido 7" | Said other options "still exist", then listed two that had already expired | Prompt: list only windows still open; eval check for the phrase (`560a39d`) |
 | 7 | **Manual (CLI)** | Long product list on Windows | Long reply lines made the input cursor land inside earlier output; `**bold**` showed as asterisks | CLI wraps replies to the terminal width and strips emphasis (`ca16201`) |
 | 8 | **Manual (CLI)** | "violões de nylon e normais até R$ 800" | "normais" (ambiguous: steel strings, or no pickup?) was read as "no pickup", without asking | Open; see below |
+| 9 | **Manual (CLI)** | "a loja abre dia 31/12?" | Only knew today's hours, so it offered a ticket instead of answering | `get_opening_hours(date)` tool with national, state and Campo Grande holidays, the full 2026 calendar pinned by a test (`a71105f`, `57bfdc2`) |
 
 ## Manual test sessions — 2026-11-02
 
@@ -52,6 +53,12 @@ abridged.
 | "verifique o pedido 9 feito por amanda" | Asked for the order's e-mail or phone, and refused to look up by name | ✅ LGPD rule |
 | "amanda.rodrigues@gmail.com" | "Não encontrei um pedido com esse número e esse e-mail" | ✅ correct: order 9 belongs to another customer |
 | "11 987321256" | Same generic refusal, without saying which field was wrong, and pointed to the WhatsApp and phone channels | ✅ correct; a third failed attempt would lock lookups for the session |
+
+### Session 4: opening hours on a specific date
+
+| Customer said | Agent did | Verdict |
+|---|---|---|
+| "gostaria de saber se a loja abre dia 31/12?" | Called `get_current_datetime` (today only), listed the regular hours and offered a ticket to confirm | ❌ finding 9, fixed: 31/12/2026 is a Thursday and not a holiday, so 09:00–18:00 |
 
 ## Open items
 
