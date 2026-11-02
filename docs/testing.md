@@ -1,12 +1,12 @@
 # Testing log
 
-How the agent was tested, and what each round of testing found and changed. There are
+This is how I tested the agent, and what each round of testing found and changed. There are
 three levels:
 
 | Level | What | How to run | Cost |
 |---|---|---|---|
 | Unit and integration | 118 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
-| Live evals | 18 scripted conversations (7 functional, 11 adversarial) graded in code | `python evals/run_evals.py <model>` | ~US$ 0.02 per run on Haiku |
+| Live evals | 19 scripted conversations (8 functional, 11 adversarial) graded in code | `python evals/run_evals.py <model>` | ~US$ 0.03 per run on Haiku |
 | Manual | A person chatting with the CLI, looking for anything that reads wrong to a customer | `python -m emporio.chat --debug --save <file>.md` | ~US$ 0.001 per message on Haiku |
 
 ## Findings and fixes
@@ -21,12 +21,12 @@ also became a test or an eval check.
 | 3 | Gemini eval | Any tool call on Gemini 3 | HTTP 400 on the follow-up request: Gemini 3 requires its `thought_signature` to be echoed back | Tool calls stored exactly as returned (`20aae5f`) |
 | 4 | Gemini eval | Full suite | Free tier allows 5 requests/min and 20/day per model; the suite exhausted it | Fallback switched to Flash Lite (15/min), throttling per model (`b59f2fe`) |
 | 5 | Groq eval | Complaint ticket | HTTP 400: Groq validates tool arguments server-side and the model sent `null` for optional fields | Optional parameters nullable; null arguments dropped so safe defaults apply (`dd65570`) |
-| 6 | **Manual (CLI)** | "Me arrependi da compra do pedido 7" | Said other options "still exist", then listed two that had already expired | Prompt: list only windows still open; eval check for the phrase (`560a39d`) |
-| 7 | **Manual (CLI)** | Long product list on Windows | Long reply lines made the input cursor land inside earlier output; `**bold**` showed as asterisks | CLI wraps replies to the terminal width and strips emphasis (`ca16201`) |
-| 8 | **Manual (CLI)** | "violões de nylon e normais até R$ 800" | "normais" (ambiguous: steel strings, or no pickup?) was read as "no pickup", without asking | Open; see below |
-| 9 | **Manual (CLI)** | "a loja abre dia 31/12?" | Only knew today's hours, so it offered a ticket instead of answering | `get_opening_hours(date)` tool with national, state and Campo Grande holidays, the full 2026 calendar pinned by a test (`a71105f`, `57bfdc2`) |
+| 6 | Manual (CLI) | "Me arrependi da compra do pedido 7" | Said other options "still exist", then listed two that had already expired | Prompt: list only windows still open; eval check for the phrase (`560a39d`) |
+| 7 | Manual (CLI) | Long product list on Windows | Long reply lines made the input cursor land inside earlier output; `bold` showed as asterisks | CLI wraps replies to the terminal width and strips emphasis (`ca16201`) |
+| 8 | Manual (CLI) | "violões de nylon e normais até R$ 800" | "normais" (ambiguous: steel strings, or no pickup?) was read as "no pickup", without asking | Prompt: ask "de aço ou sem captação?" before searching (`39a0b31`) |
+| 9 | Manual (CLI) | "a loja abre dia 31/12?" | Only knew today's hours, so it offered a ticket instead of answering | `get_opening_hours(date)` tool with national, state and Campo Grande holidays, the full 2026 calendar pinned by a test (`a71105f`, `57bfdc2`) |
 
-## Manual test sessions — 2026-11-02
+## Manual test sessions, 2026-11-02
 
 Run by me in the VS Code terminal on Windows, model `claude-haiku-5-5`. The transcripts below are
 abridged.
@@ -44,7 +44,7 @@ abridged.
 | Customer said | Agent did | Verdict |
 |---|---|---|
 | "Quais violões de nylon e normais até R$ 800?" | `search_products(category=Violões, strings=nylon, electronics=false, max_price=800)` returned 4 guitars. Prices, PIX prices and installments all came from the tool | ✅ data correct; ⚠️ finding 8, interpretation of "normais" |
-| Same question without `--debug` | Same answer, but `**bold**` was printed literally and typing the next message overwrote the last line | ❌ finding 7, fixed |
+| Same question without `--debug` | Same answer, but `bold` was printed literally and typing the next message overwrote the last line | ❌ finding 7, fixed |
 
 ### Session 3: order lookup with wrong data
 
@@ -58,11 +58,11 @@ abridged.
 
 | Customer said | Agent did | Verdict |
 |---|---|---|
-| "gostaria de saber se a loja abre dia 31/12?" | Called `get_current_datetime` (today only), listed the regular hours and offered a ticket to confirm | ❌ finding 9, fixed: 31/12/2026 is a Thursday and not a holiday, so 09:00–18:00 |
+| "gostaria de saber se a loja abre dia 31/12?" | Called `get_current_datetime` (today only), listed the regular hours and offered a ticket to confirm | ❌ finding 9, fixed: 31/12/2026 is a Thursday and not a holiday, so 09:00 to 18:00 |
 
-## Open items
+## Status
 
-- **Finding 8, ambiguous "normais".** Decide whether the agent should ask ("de aço ou sem
-  captação?") when a customer uses a term that maps to more than one filter.
-- **Re-check finding 6 on Haiku.** The fix was verified on Gemini Flash Lite (free); it has not
-  yet been re-run on the default model.
+All nine findings are fixed. The full eval suite was re-run on Haiku after the last fix
+(`39a0b31`) and passed 19 of 19, including finding 6 (only open windows are offered) and
+finding 9 (hours on a given date, a new scenario). Finding 8 is a prompt rule and has no eval
+scenario yet.

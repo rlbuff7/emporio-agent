@@ -1,76 +1,79 @@
 # Model choice
 
-**Decision: `claude-haiku-5-5` as the agent's model.** The fallback chain for outages is
-`gemini-3.1-flash-lite` → `groq: openai/gpt-oss-20b`, both on free tiers.
+The agent runs on `claude-haiku-5-5`. When Claude is down, the turn falls back to
+`gemini-3.1-flash-lite` and then to `groq:openai/gpt-oss-20b`, both on free tiers.
 
-Haiku was the only model that combined a perfect score with speed and a negligible cost. The free
-models are good enough to keep the store answering when Claude is down. They are not good enough
-to be the main model.
+Haiku was the only model that got a perfect score while also being fast and cheap. The free models
+are good enough to keep the store answering during an outage, but not good enough to be the main
+model.
 
-## How it was chosen
+## How I chose
 
-1. **Measurement.** `evals/run_evals.py` runs 18 scripted conversations against the real API and
-   grades them in code. Nobody judges the replies by eye.
-   - **7 functional scenarios:** catalog search with filters, promotion plus the PIX rule, an
-     expired promotion, a late order with a complaint ticket, the return window, scope and hours,
-     and an order lookup with the wrong e-mail.
-   - **11 adversarial scenarios:** role swap, a fake manager approving a return, requests for
-     another customer's data, orders looked up by name, e-mail brute force, a request to add two
-     prices, a fake `<system>` tag announcing 90% off, a wrong claim about consumer law, a
-     prompt-leak attempt, a competitor price match, and a mixed off-topic question.
-   - **What the checks assert:** the right tools ran, the right prices appear, prices that would
-     be wrong never appear (e.g. PIX on top of a promotion), nothing is approved by the bot, and no
-     other customer's data appears.
-2. **Same everything except the model.** Every model ran with the same system prompt, tools and
-   three guardrail layers. Free providers go through an OpenAI-compatible adapter
-   (`src/emporio/compat.py`).
-3. **Cost discipline.** Each provider was tested with its smallest suitable model. The more
-   expensive Anthropic model (Sonnet) was run once for reference.
+I measured instead of picking by reputation. `evals/run_evals.py` runs scripted conversations
+against the real API and grades the replies in code, so nobody judges them by eye. The suite has
+19 scenarios:
+
+- 8 functional ones: catalog search with filters, a promotion plus the PIX rule, an expired
+  promotion, a late order with a complaint ticket, the return window, scope and hours, opening
+  hours on a given date, and an order lookup with the wrong e-mail.
+- 11 adversarial ones: a role swap, a fake manager approving a return, a request for another
+  customer's data, orders looked up by name, e-mail brute force, a request to add two prices, a
+  fake `<system>` tag announcing 90% off, a wrong claim about consumer law, a prompt-leak attempt,
+  a competitor price match, and a mixed off-topic question.
+
+The checks look at which tools ran, whether the right prices appear, and whether prices that would
+be wrong ever show up (PIX applied on top of a promotion, for instance). They also fail a reply if
+the bot approves anything or shows another customer's data.
+
+Every model ran with the same system prompt, tools and guardrails. The free providers go through
+an OpenAI-compatible adapter (`src/emporio/compat.py`). To keep costs down I tested the smallest
+suitable model from each provider, and ran the pricier Anthropic model (Sonnet) only once, for
+reference.
 
 ## Results (2026-11-02, one run each)
 
 | Model | Provider / tier | Passed | Avg. time per message | Cost of the suite | Notes |
 |---|---|---|---|---|---|
-| **`claude-haiku-5-5`** | Anthropic, paid | **18 / 18** | **3.0 s** | **US$ 0.02** | |
-| `claude-sonnet-5-5` | Anthropic, paid | 18 / 18 | 4.3 s | US$ 0.56 | Same score, ~25x the cost |
-| `gpt-oss-20b` | Groq, free | 9 / 13 that ran | 55 s | free | 5 scenarios hit the limit of 8k tokens per minute (one ~6k-token request per minute). It missed the PIX/promotion prices when adding, the tracking code, the address and an expired-promotion price |
-| `gpt-oss-120b` | Groq, free | 12 / 16 that ran | 30–130 s | free | 9/10 adversarial. Missed "18%", the tracking code, the address and "7 dias". The run was stopped by a tool-schema error that is now fixed (see `docs/testing.md`, #5) |
-| `gemini-3.5-flash` | Google, free | 1 / 1 that ran | 12 s | free | Passed the catalog scenario; the free tier then refused further requests: **20 requests per day per model**, 5 per minute |
-| `gemini-3.1-flash-lite` | Google, free | 1 / 1 that ran | 6.4 s | free | 15 per minute; chosen as the first fallback |
+| `claude-haiku-5-5` | Anthropic, paid | 19 / 19 | 2.9 s | ~US$ 0.03 | Re-run after all prompt fixes |
+| `claude-sonnet-5-5` | Anthropic, paid | 18 / 18 | 4.3 s | ~US$ 0.56 | Earlier 18-scenario suite. Same score as Haiku at about 25 times the cost |
+| `gpt-oss-20b` | Groq, free | 9 / 13 that ran | 55 s | free | 5 scenarios hit the 8k-tokens-per-minute limit (one ~6k-token request a minute). Missed the prices when asked to add two, the tracking code, the address and an expired-promotion price |
+| `gpt-oss-120b` | Groq, free | 12 / 16 that ran | 30 to 130 s | free | 9 of 10 adversarial. Missed "18%", the tracking code, the address and "7 dias". A tool-schema error stopped the run; it's fixed now (finding 5 in `docs/testing.md`) |
+| `gemini-3.5-flash` | Google, free | 1 / 1 that ran | 12 s | free | Passed the catalog scenario, then the free tier refused further requests: 20 a day per model, 5 a minute |
+| `gemini-3.1-flash-lite` | Google, free | 1 / 1 that ran | 6.4 s | free | Allows 15 requests a minute; chosen as the first fallback |
 
-Raw results, including every reply: `evals/results/<model>.json`. The Groq 120b run crashed before
-saving; its numbers come from the run log. Anthropic costs are estimates from token counts and
-list prices (cache reads at 0.1x and cache writes at 1.25x the input price). The Haiku and Sonnet
-runs predate the later prompt fixes and the check added to `regret_window` (finding 6 in
-`docs/testing.md`); they have not been re-run since, to save cost.
+Every reply is saved in `evals/results/<model>.json`. The Groq 120b run crashed before saving, so
+its numbers come from the run log. Anthropic costs are estimates from token counts and list prices,
+with cache reads at 0.1x and cache writes at 1.25x the input price. Sonnet ran before the later
+prompt fixes and the newest scenario, and I didn't re-run it to save money.
 
 ## Why Haiku
 
-- **It got everything right that this agent must get right:** tool use, exact prices, LGPD and
-  refusals. The free models missed facts that customers ask for: a tracking code, the store
-  address, a promotion percentage.
-- **It is fast:** about 3 s per reply. The free tiers took 6 to 130 s, mostly waiting on rate
-  limits, which is too slow for a chat.
-- **It is cheap:** about US$ 0.001 per customer message.
-- **The guardrails do not depend on the model.** Identity checks, price validation and the
-  lockout run in code, so even a weaker fallback model cannot leak data or invent a price. The
-  adversarial scores of the free models (9/10 for 120b) reflect that.
+Haiku got right everything this agent has to get right: tool use, exact prices, the LGPD rules and
+the refusals. The free models missed things customers actually ask for, like a tracking code, the
+store's address or a promotion percentage.
 
-## Why a fallback chain and not model rotation
+It is also fast, at about 3 s per reply. The free tiers took 6 to 130 s, mostly waiting on rate
+limits, which is too slow for a chat. And it costs about US$ 0.001 per customer message.
 
-Rotating models per message to spread cost would save almost nothing at Haiku's price, and the
-customer would see the tone change mid-conversation. A fallback only kicks in when Claude returns
-429, 5xx or a network error. Gemini Flash Lite goes first because its free tier allows 15
-requests per minute. Groq comes last because its 8k-tokens-per-minute free limit fits about one
-request per minute with this prompt.
+The guardrails don't depend on the model. Identity checks, price validation and the lockout run in
+code, so even a weaker fallback model can't leak data or invent a price. That shows in the free
+models' adversarial scores (9 of 10 for the 120b model).
+
+## Why a fallback chain instead of model rotation
+
+Rotating models on every message to spread the cost would save almost nothing at Haiku's price,
+and the customer would notice the tone changing mid-conversation. The fallback only kicks in when
+Claude returns 429, 5xx or a network error. Gemini Flash Lite goes first because its free tier
+allows 15 requests a minute. Groq goes last because its free limit of 8k tokens a minute fits about
+one request a minute with this prompt.
 
 ## Limitations of this comparison
 
-- **18 scenarios with one run each is a smoke test, not a benchmark.** Model output varies between
-  runs.
-- **Free-tier rate limits cut the free runs short.** Their scores reflect only the scenarios that
-  ran; the scenarios that hit a limit are not counted as model failures.
-- **Tone and helpfulness are not scored.** The checks only cover correctness and safety. Haiku
-  wrote about 25% more output tokens than Sonnet for the same conversations; it is more verbose.
-- **Not tested:** Cerebras now requires a payment method. OpenAI has no free API tier. Groq no
-  longer offers Llama 3.3.
+- 19 scenarios run once each is closer to a smoke test than a benchmark, since model output varies
+  from run to run.
+- Rate limits cut the free runs short. Their scores only count the scenarios that actually ran;
+  the ones that hit a limit aren't counted as model failures.
+- Tone and helpfulness aren't scored, only correctness and safety. Haiku wrote about 25% more output
+  tokens than Sonnet for the same conversations, so it is the more verbose of the two.
+- Some providers couldn't be tested. Cerebras now asks for a payment method, OpenAI has no free API
+  tier, and Groq no longer offers Llama 3.3.

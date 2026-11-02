@@ -1,12 +1,12 @@
-# Empório da Música — customer-service agent
+# Empório da Música: customer-service agent
 
-A text-chat agent for **Empório da Música**, a fictional musical-instrument store in Campo Grande/MS.
-It answers customers in Brazilian Portuguese, looks up products, prices, promotions and orders in
-the store's data, applies the store's policy manual, opens tickets for the human team when a
-decision is not its to make, and refuses what is out of scope.
+A text-chat agent for Empório da Música, a fictional musical-instrument store in Campo Grande/MS.
+It answers customers in Brazilian Portuguese. It looks up products, prices, promotions and orders
+in the store's data, applies the store's policy manual, opens a ticket for the human team when a
+decision isn't its to make, and turns down anything outside the store's scope.
 
-Built for the Artefact AI Engineer technical challenge. Python, the Anthropic SDK called directly
-(no agent framework), SQLite, and a command-line chat.
+I built it for the Artefact AI Engineer technical challenge in Python, with the Anthropic SDK called
+directly (no agent framework), SQLite and a command-line chat.
 
 ```text
 Você: Quanto custa o Crafter HT-100? Tem desconto no PIX?
@@ -23,17 +23,8 @@ Sobre o PIX: o desconto de 5% não se aplica a produtos que já estão em promo�
 
 ## Quickstart
 
-Requirements: Python 3.11+ and **your own** Anthropic API key ([console.anthropic.com](https://console.anthropic.com)).
-No key is included in the repository. A full test conversation costs about US$ 0.01 with the default
-model.
-
-**No Anthropic key?** You still have two options:
-- `pytest` and the transcripts in `examples/` need no key at all.
-- With a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey), no card),
-  you can chat with the agent: set `GEMINI_API_KEY` and
-  `EMPORIO_MODEL=gemini:gemini-3.1-flash-lite` in `.env`, after `pip install -e ".[free]"`. The tools
-  and guardrails are identical, but the free model is slower and less accurate (see
-  [`docs/model_choice.md`](docs/model_choice.md)).
+You need Python 3.11+ and your own Anthropic API key ([console.anthropic.com](https://console.anthropic.com)).
+The repository contains no key. A full test conversation costs about US$ 0.01 with the default model.
 
 ```bash
 git clone https://github.com/rlbuff7/emporio-agent.git
@@ -50,17 +41,21 @@ python -m emporio.chat --debug    # ...and see every tool call, its result and g
 pytest                            # 118 offline tests, no API key needed
 ```
 
-Inside the chat: `/reset` starts a new conversation, `/sair` quits. `--save file.md` writes the
-transcript to Markdown on exit (that is how `examples/` was produced).
+Inside the chat, `/reset` starts a new conversation and `/sair` quits. `--save file.md` writes the
+transcript to Markdown on exit, which is how the files in `examples/` were made.
 
-Optional:
+If you don't have an Anthropic key, `pytest` and the transcripts in `examples/` need no key at all.
+You can also chat with the agent on a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey),
+no card): run `pip install -e ".[free]"`, then set `GEMINI_API_KEY` and
+`EMPORIO_MODEL=gemini:gemini-3.1-flash-lite` in `.env`. The tools and guardrails are the same, but
+the free model is slower and makes more mistakes (see [`docs/model_choice.md`](docs/model_choice.md)).
+
+Other options:
 
 ```bash
-python evals/run_evals.py                          # 18 live scenarios graded in code (~US$ 0.02 with Haiku)
+python evals/run_evals.py                          # 19 live scenarios graded in code (~US$ 0.03 with Haiku)
 EMPORIO_MODEL=claude-sonnet-5-5 python -m emporio.chat          # another Anthropic model
-pip install -e ".[free]"                                        # free providers, see docs/model_choice.md
-EMPORIO_MODEL=gemini:gemini-3.5-flash python -m emporio.chat    # needs GEMINI_API_KEY
-EMPORIO_FALLBACK_MODEL=gemini:gemini-3.1-flash-lite,groq:openai/gpt-oss-20b python -m emporio.chat  # Claude → Gemini → Groq
+EMPORIO_FALLBACK_MODEL=gemini:gemini-3.1-flash-lite,groq:openai/gpt-oss-20b python -m emporio.chat  # Claude, then Gemini, then Groq
 ```
 
 ---
@@ -94,26 +89,26 @@ EMPORIO_FALLBACK_MODEL=gemini:gemini-3.1-flash-lite,groq:openai/gpt-oss-20b pyth
 
 | File | Role |
 |---|---|
-| `src/emporio/etl.py` | CSVs → SQLite with typing, NULLs, validated JSON and an `active_promotions` view |
-| `src/emporio/tools.py` | The seven tools. All arithmetic lives here: promotion and PIX prices, installments, return and warranty windows, opening hours |
+| `src/emporio/etl.py` | CSVs to SQLite, with typing, NULLs, validated JSON and an `active_promotions` view |
+| `src/emporio/tools.py` | The seven tools. All arithmetic lives here: promotion and PIX prices, installments, return and warranty windows, opening hours and holidays |
 | `src/emporio/tool_schemas.py` | Tool definitions as the model sees them |
-| `src/emporio/prompts.py` | System prompt: persona, rules, resolved contradictions in the manual, and the manual itself |
-| `src/emporio/agent.py` | The loop. `BaseAgent` holds the provider-independent flow and the guardrails; `Agent` is the Anthropic adapter; `FallbackAgent` hands a turn to a second provider when Claude is down |
+| `src/emporio/prompts.py` | System prompt: persona, rules, how the manual's contradictions were resolved, and the manual itself |
+| `src/emporio/agent.py` | The loop. `BaseAgent` holds the provider-independent flow and the guardrails, `Agent` talks to Anthropic, and `FallbackAgent` hands a turn to another provider when Claude is down |
 | `src/emporio/guardrails.py` | Input and output checks |
-| `src/emporio/compat.py` | Adapter for OpenAI-compatible providers (Gemini, Groq...), used for the model comparison and as the fallback |
+| `src/emporio/compat.py` | Adapter for OpenAI-compatible providers (Gemini, Groq...), used for the model comparison and the fallback |
 | `src/emporio/chat.py` | CLI |
-| `data/policies.md` | The policy PDF converted to Markdown, verbatim |
+| `data/policies.md` | The policy PDF converted to Markdown, word for word |
 
-**Tools.**
+The tools:
 
 | Tool | Purpose |
 |---|---|
-| `search_products` | Catalog search with category, price, strings and pickup filters; sorted by final price |
-| `get_product` | One product by name or id, with fuzzy matching, specs, ended promotions and alternatives when unavailable |
-| `get_active_promotions` | Original price, discount and final price |
-| `get_order_status` | Requires the order number **and** that order's e-mail or phone |
-| `get_current_datetime` | Campo Grande time, open or closed, holiday, next opening |
-| `get_opening_hours` | Whether the store opens on any date (weekends, national, state and Campo Grande holidays) |
+| `search_products` | Catalog search with category, price, string-type and pickup filters, sorted by final price |
+| `get_product` | One product by name or id, with fuzzy matching, specs, ended promotions, and alternatives when it's unavailable |
+| `get_active_promotions` | Original price, discount and final price of each active promotion |
+| `get_order_status` | Needs the order number and the e-mail or phone on that order |
+| `get_current_datetime` | Time in Campo Grande, open or closed, holiday, next opening |
+| `get_opening_hours` | Whether the store opens on a given date, counting weekends and national, state and city holidays |
 | `escalate_to_human` | Opens a ticket in `data/handoffs.jsonl` and returns its number |
 
 ---
@@ -122,156 +117,153 @@ EMPORIO_FALLBACK_MODEL=gemini:gemini-3.1-flash-lite,groq:openai/gpt-oss-20b pyth
 
 | Decision | Choice | Why |
 |---|---|---|
-| Agent approach | **Function calling for data, full manual in the system prompt for policies** | Prices, stock and orders are tabular and need exact queries, never generated text. The manual is ~8 pages (~4k tokens): it fits in context, so retrieval would add a failure mode (a missed chunk) and buy nothing. If the manual grew, the next step would be RAG with one chunk per numbered section. |
-| Framework | **None**: a small loop on the Anthropic SDK | The loop is small, readable and easy to debug: one place shows exactly what goes to the model and what comes back. A framework would hide the parts the challenge evaluates. |
-| Model | **`claude-haiku-5-5`** | Measured, not assumed, on 18 graded scenarios. Haiku 5.5 scored 18/18 at 3.0 s per reply for US$ 0.02 per suite. Sonnet 5.5 also scored 18/18, but slower and ~25x the cost. The free models (Groq `gpt-oss`, Gemini Flash) missed facts customers ask for and were slowed to 6–130 s by rate limits. Details: [`docs/model_choice.md`](docs/model_choice.md). |
-| Where numbers come from | **Code only** | The model never computes a price, discount, installment or deadline. Tools return final values, and the output guardrail rejects any `R$` amount that no tool returned. |
-| Database | **SQLite generated from the CSVs** | Zero infrastructure, real SQL, reproducible with one command. The tools open it read-only. |
-| Interface | **CLI** | The focus is the agent. `--debug` shows tool calls, which makes the behaviour auditable. |
-| Conversation history | **In memory, per session** | Needed for multi-turn flows such as identity verification. Persisting it would mean storing personal data, with no benefit for a prototype. |
-| Human handoff | **Tool that writes a ticket** | The policy spec splits use cases into AUTO / TRIAGE / HUMAN. The bot never approves or denies a return, exchange, warranty or discount: it checks eligibility, collects data and opens a ticket. |
-| Prompt strategy | Static system prompt (persona → rules → resolved contradictions → manual), cached | Static content caches well: most input tokens are cache reads. Anything time-dependent comes from a tool, never from the prompt. |
-| Safety | Three layers: input heuristics, tools that enforce rules in code, output validation | Prompt rules alone can be argued with. The layers that matter (identity, prices) are in code, so a successful injection still cannot read another customer's order or invent a discount. |
-| Availability | **Optional fallback chain** (`EMPORIO_FALLBACK_MODEL`): Claude → Gemini Flash Lite → Groq `gpt-oss-20b` | If Claude returns 429, 5xx or a network error, that turn goes to the next provider in the chain (free tiers), with the same tools and guardrails; if that one is down too, the next one. The following turn goes back to Claude. I chose this over rotating models per message, which changes the tone mid-conversation and saves almost nothing at these prices. |
+| Agent approach | Function calling for data; the whole manual in the system prompt for policies | Prices, stock and orders are tabular and need exact queries. The manual is about 8 pages (~4k tokens), so it fits in context, and retrieval would only add a way to fail (a missed chunk). If the manual grew, I'd move to RAG with one chunk per numbered section. |
+| Framework | None, just a small loop on the Anthropic SDK | Everything sent to the model and everything that comes back passes through one place, which makes it easy to read and debug. A framework would hide exactly the parts the challenge is evaluating. |
+| Model | `claude-haiku-5-5` | I picked it after running 19 graded scenarios. Haiku 5.5 passed all 19 at 2.9 s per reply and about US$ 0.03 per run. Sonnet 5.5 also passed everything on the earlier 18-scenario suite, but it was slower and cost about 25 times more. The free models (Groq `gpt-oss`, Gemini Flash) missed facts customers ask for, and rate limits slowed them to 6 to 130 s per reply. Details in [`docs/model_choice.md`](docs/model_choice.md). |
+| Where numbers come from | Code only | The model never computes a price, discount, installment or deadline. The tools return final values, and the output guardrail rejects any `R$` amount that didn't come from a tool. |
+| Database | SQLite built from the CSVs | No infrastructure, real SQL, rebuilt with one command. The tools open it read-only. |
+| Interface | CLI | The challenge is about the agent. `--debug` prints every tool call, so you can check where each answer came from. |
+| Conversation history | In memory, per session | Multi-turn flows need it, identity verification for example. Persisting it would mean storing personal data, which a prototype gains nothing from. |
+| Human handoff | A tool that writes a ticket | The policy spec sorts use cases into AUTO, TRIAGE and HUMAN. The bot never approves or denies a return, exchange, warranty claim or discount. It checks eligibility, collects the data and opens a ticket. |
+| Prompt strategy | Static system prompt (persona, rules, resolved contradictions, manual), cached | Static content caches well, so most input tokens are cache reads. Anything that depends on the date or time comes from a tool. |
+| Safety | Three layers: input heuristics, tools that enforce the rules in code, output validation | A customer can argue with a prompt rule. Identity and prices are enforced in code, so even a successful injection can't read another customer's order or invent a discount. |
+| Availability | Optional fallback chain (`EMPORIO_FALLBACK_MODEL`): Claude, then Gemini Flash Lite, then Groq `gpt-oss-20b` | When Claude returns 429, 5xx or a network error, that turn goes to the next provider in the chain, with the same tools and guardrails. The next turn goes back to Claude. I preferred this to rotating models on every message, which would change the tone mid-conversation and save almost nothing at these prices. |
 
 ---
 
 ## Data handling
 
-Full report: [`docs/data_quality.md`](docs/data_quality.md). It lists 15 findings, the decision for
-each, and every data finding is pinned by a test. Highlights:
+The full report is in [`docs/data_quality.md`](docs/data_quality.md): 15 findings, the decision for
+each, and a test pinning every data finding. The ones that shaped the agent most:
 
-- **Descriptions contradict names and specs** for basses, drums and keyboards: a "Music Man" bass is
-  described as a Fender, and an "88-key" description sits on a 61-key spec. The agent uses name,
-  specs and price, and does not quote those descriptions.
-- **Promotions have no dates**, only an `is_active` flag and a campaign label. Today is November,
-  Black Friday month, yet the Black Friday rows are inactive. The flag wins, and the agent never
-  infers a discount from the calendar.
-- **Order totals differ from current prices** for orders 3 and 20, and `order_items` has no unit
-  price. The recorded total is shown as the amount charged.
-- **Two customers share an e-mail.** Identity is verified per order (order number plus that
-  order's e-mail or phone), never by e-mail alone.
-- **The manual contradicts itself** on the phone number, the e-mail spelling and the installment
-  minimums. Each choice is documented and stated in the prompt.
+- Descriptions contradict names and specs for basses, drums and keyboards. A "Music Man" bass is
+  described as a Fender, and an "88-key" description sits on a 61-key spec. The agent goes by name,
+  specs and price and doesn't quote those descriptions.
+- Promotions have no dates, just an `is_active` flag and a campaign label. It's November, Black
+  Friday month, and the Black Friday rows are inactive anyway. The flag wins; the agent never infers
+  a discount from the calendar.
+- Orders 3 and 20 don't add up at current prices, and `order_items` has no unit price, so the
+  recorded total is shown as the amount charged.
+- Two customers share an e-mail address. That's why identity is checked per order (order number
+  plus that order's e-mail or phone) and never by e-mail alone.
+- The manual contradicts itself on the phone number, the e-mail spelling and the installment
+  minimums. Each choice is written down and stated in the prompt.
 
 ---
 
 ## Assumptions
 
-- **"Today"** is the real date in Campo Grande (UTC-4, no daylight saving).
-- **Return windows count from receipt**, but the data has no receipt date. `estimated_delivery` is
-  used as an estimate, and the agent asks the customer to confirm it before stating eligibility.
-- **Holidays:** national, Mato Grosso do Sul and Campo Grande holidays close the store (Good Friday is
-  computed from Easter). Carnival, Corpus Christi and the 24/12 and 31/12 eves are "pontos
-  facultativos" in Decreto Municipal 16.469, so the store opens. The two municipal holidays come
-  from the press and the TJMS calendar; the law creating them was not located.
-- **Phone vs. WhatsApp:** (67) 3341-4444 is the phone and (67) 3321-4500 the WhatsApp, because the
-  manual's section 7 is specifically about the channel.
-- **Installments:** section 3.1's tiers are used. "No minimum, except below R$ 50" is read as a
-  R$ 50 minimum installment for up to 3x; the cheapest product is R$ 159.90, so this never changes
-  an answer.
-- **Shipping to other cities** needs CEP, weight and dimensions that the data does not have. The
+- "Today" is the real date in Campo Grande (UTC-4, no daylight saving).
+- Return windows count from receipt, but the data has no receipt date. The agent uses
+  `estimated_delivery` as an estimate and asks the customer to confirm it before saying whether a
+  window is open.
+- National, Mato Grosso do Sul and Campo Grande holidays close the store. Good Friday is computed
+  from Easter. Carnival, Corpus Christi and the 24/12 and 31/12 eves are "pontos facultativos" in
+  Decreto Municipal 16.469, so the store opens on those days. The two city holidays come from the
+  press and the TJMS court calendar; I couldn't find the law that creates them.
+- (67) 3341-4444 is the phone and (67) 3321-4500 is the WhatsApp, because section 7 of the manual is
+  the one about that channel.
+- Installments follow the tiers in section 3.1. I read "no minimum, except below R$ 50" as a R$ 50
+  minimum installment for up to 3x. The cheapest product costs R$ 159.90, so this never changes an
+  answer.
+- Shipping to other cities needs a CEP, weight and dimensions, and the data has none of those. The
   agent opens a quote ticket instead of guessing.
-- **The customers are Brazilian**, so the agent replies in Portuguese, and everything else in the
-  repository is in English, as requested.
+- The customers are Brazilian, so the agent answers in Portuguese. Everything else in the
+  repository is in English, as the challenge asks.
 
 ---
 
 ## Example conversations
 
-Generated with the CLI in `--debug` mode, so each shows the tools the agent called.
+All five were generated with the CLI in `--debug` mode, so each one shows the tools the agent
+called.
 
 1. [Catalog search with filters](examples/01_catalog_search.md): "violões até R$ 1000", then nylon for a beginner.
-2. [Price, promotion and the PIX rule](examples/02_price_promotion_pix.md): the discounts do not stack.
-3. **Non-trivial:** [Late order and complaint](examples/03_late_order_complaint.md). Identity check,
-   a 247-day delay computed in code, a complaint ticket, and the store closed for a holiday.
-4. **Non-trivial:** [Return request outside the window](examples/04_return_policy.md). The policy
-   is applied to real dates, and nothing is approved by the bot.
+2. [Price, promotion and the PIX rule](examples/02_price_promotion_pix.md): the discounts don't stack.
+3. [Late order and complaint](examples/03_late_order_complaint.md) (non-trivial): identity check, a
+   247-day delay computed in code, a complaint ticket, and the store closed for a holiday.
+4. [Return request outside the window](examples/04_return_policy.md) (non-trivial): the policy is
+   applied to the real dates, and the bot approves nothing.
 5. [Out of scope, store info and prompt injection](examples/05_out_of_scope_and_hours.md).
 
 ---
 
 ## Testing
 
-- **118 offline tests** (`pytest`, no key, no network). They cover the ETL, every data-quality finding,
-  every tool rule (pricing, PIX, installments, LGPD, lockout, windows, hours), the agent loop with
-  scripted fake clients, both adapters, the fallback, and the guardrails.
-- **18 live scenarios** (`evals/run_evals.py`) graded in code:
-  - **7 functional:** catalog, promotion and PIX, an expired promotion, a late order, the return
-    window, scope and hours, and a lookup with the wrong e-mail.
-  - **11 adversarial:** role swap, a fake manager, data exfiltration, orders looked up by name,
-    e-mail brute force, a fake `<system>` tag, a wrong claim about consumer law, a prompt leak, a
-    competitor price match, a request to add prices, and a mixed off-topic question.
+There are three levels, and [`docs/testing.md`](docs/testing.md) records what each one found.
 
-  Results per model are in `evals/results/`.
-- **Manual testing** in the CLI found problems the scripted tests did not: expired options listed
-  as still available, terminal display issues, a date question answered with a ticket. Every
-  finding and the commit that fixed it is in [`docs/testing.md`](docs/testing.md).
+1. `pytest` runs 118 offline tests with no key and no network. They cover the ETL, every
+   data-quality finding, every tool rule (pricing, PIX, installments, LGPD, lockout, return windows,
+   opening hours and the 2026 holiday calendar), the agent loop with scripted fake clients, both
+   adapters, the fallback and the guardrails.
+2. `evals/run_evals.py` runs 19 live conversations and grades them in code. Eight are functional:
+   catalog, promotion and PIX, an expired promotion, a late order, the return window, scope and
+   hours, hours on a given date, and a lookup with the wrong e-mail. Eleven are adversarial: a role
+   swap, a fake manager, a request for another customer's data, orders looked up by name, e-mail
+   brute force, a fake `<system>` tag, a wrong claim about consumer law, a prompt leak, a competitor
+   price match, a request to add two prices, and a mixed off-topic question. Results per model are
+   in `evals/results/`.
+3. I also tested by hand in the CLI. That caught problems the scripts didn't: expired options listed
+   as if they were still open, display glitches in the Windows terminal, a date question answered
+   with a ticket, and an ambiguous word picked silently. Each one has a fix commit in the testing log.
 
 ---
 
 ## Known limitations
 
-- **18 live scenarios with one run each** is a smoke test, not a benchmark: model output varies
-  between runs.
-- **The agent will not add prices together** ("os dois juntos dão quanto?"). It lists each price,
-  because the output guardrail allows only amounts that a tool returned. A `quote_total` tool would
-  fix this properly.
-- **Fuzzy product search is substring-based.** Typos such as "Takamini" are not matched.
-- **The injection heuristic is a list of patterns.** It only adds a reminder; the real protection is
-  in the tools and the output check.
-- **Single process, single conversation, in-memory state.** Tickets go to a local JSONL file. The
-  verification lockout is per session, so a restart resets it; a real channel would key it by phone
-  number.
-- **No real channel:** no WhatsApp integration, and no out-of-hours auto-reply flow beyond what the
-  agent says.
+- 19 scenarios run once each is closer to a smoke test than a benchmark. Model output varies from
+  run to run.
+- The agent won't add prices together ("os dois juntos dão quanto?"). It lists each price, because
+  the output guardrail only allows amounts a tool returned. A `quote_total` tool would solve it.
+- Product search matches substrings, so a typo like "Takamini" finds nothing.
+- The injection check is a list of patterns, and all it does is add a reminder. The real
+  protection is in the tools and the output check.
+- Everything runs in one process with in-memory state, and tickets go to a local JSONL file. The
+  verification lockout is per session, so restarting the CLI resets it; a real channel would key it
+  by phone number.
+- There's no real channel: no WhatsApp integration and no out-of-hours queue beyond what the agent
+  tells the customer.
 
-## What I would do with more time
+## What I'd do with more time
 
-- **A paid fallback.** The current fallback uses the Gemini free tier, which in testing hit its
-  per-minute limit after about 8 requests. A paid fallback would make availability predictable.
-- **A bigger eval set** with repeated runs and an LLM judge for tone, run in CI on prompt changes.
-- **A `quote_total` tool** for carts and proposals (UC-03 in the spec): totals, PIX and installments,
-  computed in code.
-- **Persistence and channel:** conversations and tickets in a real database, the WhatsApp Business
-  API, and an out-of-hours queue.
-- **Observability:** tracing of every tool call and guardrail event, and dashboards for handoff
-  rate and failed verifications.
-- **RAG with one chunk per manual section,** if the manual grows past what fits comfortably in
+- Pay for the fallback. The free Gemini tier hit its per-minute limit after about 8 requests in
+  testing, and a paid tier would make the fallback dependable.
+- Grow the eval set, run each scenario several times, add an LLM judge for tone, and run it in CI
+  whenever the prompt changes.
+- Add a `quote_total` tool for carts and proposals (UC-03 in the spec), with totals, PIX and
+  installments computed in code.
+- Store conversations and tickets in a real database and connect the WhatsApp Business API, with an
+  out-of-hours queue.
+- Trace every tool call and guardrail event, with dashboards for handoff rate and failed
+  verifications.
+- Switch to RAG with one chunk per manual section if the manual grows past what fits comfortably in
   context.
-- **Payments (deliberately out of scope).** A payment gateway behind an adapter, PIX or a payment
-  link generated by code, an idempotent webhook to confirm, stock deducted only after payment, and
-  humans only for exceptions.
+- Payments, which I left out on purpose: a gateway behind an adapter, a PIX code or payment link
+  generated by code, an idempotent confirmation webhook, stock deducted only after payment, and
+  people involved only in the exceptions.
 
 ---
 
 ## How I used an AI coding assistant
 
-I used **Claude Code** as a pair programmer, with this workflow:
+I used Claude Code as a pair programmer, and the process went like this.
 
-1. **Plan before code.** Before any code, I prepared a working plan and a business-rules
-   spec that maps every manual section to a use case with an autonomy level. Both are in
-   Portuguese and kept out of the repository. The repo's `CLAUDE.md` holds the standing rules: English
-   deliverables, Portuguese replies, no framework, numbers only in code, one phase at a time, small
-   commits.
-2. **One phase at a time, with my review between phases.** Claude Code proposed each phase's plan
-   (ETL → tools → agent → guardrails → examples → README). I reviewed it, changed what I disagreed
-   with, then let it execute and commit. The commit history follows those phases.
-3. **My decisions:**
-   - CLI over a WhatsApp mock, to keep it simple.
-   - SQLite over a database server.
-   - A **three-layer guardrail**: I asked for checks at the start, in the middle and at the end of
-     each turn.
-   - Live adversarial testing.
-   - Measuring models instead of picking one.
-   - Testing **free providers** too.
-   - Haiku as the default.
-   - A **fallback** to Gemini instead of rotating models.
-4. **What the assistant did:** profiled the data and found most of the 15 issues, wrote the code
-   and tests, ran the live scenarios, and fixed what they exposed. Examples:
-   - The bot opened a ticket on a holiday without saying the store was closed.
-   - Gemini 3 needs its `thought_signature` echoed back.
-   - An injection phrasing slipped past the input heuristic.
-5. **How I validated it:** read the diffs, ran the CLI myself, checked the transcripts, and kept
-   `pytest` green on every commit. One rule I enforced: every claim in the docs had to be backed by
-   a test or a measurement.
+1. Plan first. Before writing any code I prepared a working plan and a business-rules spec that
+   maps each section of the manual to a use case with an autonomy level. Both are in Portuguese and
+   stay out of the repository. The standing rules live in `CLAUDE.md`: English deliverables,
+   Portuguese replies to customers, no framework, numbers computed only in code, one phase at a
+   time, small commits.
+2. One phase at a time, with my review in between. Claude Code proposed the plan for each phase
+   (ETL, tools, agent, guardrails, examples, README). I reviewed it and changed what I disagreed
+   with, then let it build and commit. The commit history follows those phases.
+3. The calls I made: a CLI rather than a WhatsApp mock, SQLite rather than a database server, a
+   guardrail at the start, middle and end of every turn, live adversarial testing, measuring models
+   instead of picking one, trying free providers, Haiku as the default, a fallback chain instead of
+   model rotation, and testing the smallest model of each provider to save tokens.
+4. What the assistant did: it profiled the data and found most of the 15 issues, wrote the code and
+   the tests, ran the live scenarios and fixed what they exposed. Some examples: the bot opened a
+   ticket on a holiday without saying the store was closed, Gemini 3 needs its `thought_signature`
+   sent back, and one injection phrasing slipped past the input check.
+5. How I checked its work: I read the diffs, used the CLI myself (my sessions found four of the
+   problems in the testing log), read the transcripts, and kept `pytest` green on every commit. I
+   also held it to one rule: every claim in these docs had to come from a test or a measurement.
