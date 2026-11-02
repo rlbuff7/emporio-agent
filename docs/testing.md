@@ -56,6 +56,8 @@ abridged.
 
 ### Session 4: opening hours on a specific date
 
+Transcript: [`examples/manual/teste-01.md`](../examples/manual/teste-01.md).
+
 | Customer said | Agent did | Verdict |
 |---|---|---|
 | "gostaria de saber se a loja abre dia 31/12?" | Called `get_current_datetime` (today only), listed the regular hours and offered a ticket to confirm | ❌ finding 9, fixed: 31/12/2026 is a Thursday and not a holiday, so 09:00 to 18:00 |

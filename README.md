@@ -10,16 +10,27 @@ decision isn't its to make, and turns down anything outside the store's scope.
 I built it for the Artefact AI Engineer technical challenge in Python, with the Anthropic SDK called
 directly (no agent framework), SQLite and a command-line chat.
 
+An excerpt from [`examples/02_price_promotion_pix.md`](examples/02_price_promotion_pix.md), run with
+`--debug` so the tool call and its result show up before the reply:
+
 ```text
 Você: Quanto custa o Crafter HT-100? Tem desconto no PIX?
   [tool] get_product({"name_or_id": "Crafter HT-100"})
+         -> {"product_id": 90, ..., "original_price_brl": 2399.0, "promotion": {"campaign": "Desconto
+            Exclusivo", "discount_percent": 18}, "final_price_brl": 1967.18, "pix_price_brl": null, ...}
 Empório da Música: O Crafter HT-100 Folk Aço Natural está em promoção "Desconto Exclusivo":
+
 - Preço original: R$ 2.399,00
 - Desconto: 18%
 - Preço final: R$ 1.967,18
 - Parcelamento: até 12x de R$ 163,93 sem juros
-Sobre o PIX: o desconto de 5% não se aplica a produtos que já estão em promoção...
+
+Sobre o PIX: o desconto de 5% não se aplica a produtos que já estão em promoção, então esse não tem
+preço especial no PIX. O estoque atual é de 3 unidades.
 ```
+
+Every number in the reply is in the tool result. `"pix_price_brl": null` is how the code tells the
+model there is no PIX discount on a promoted item; the model doesn't decide that.
 
 ---
 
