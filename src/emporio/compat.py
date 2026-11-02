@@ -28,7 +28,7 @@ class Provider:
 
 
 PROVIDERS = {
-    # Gemini's free tier returned 429 at ~8 requests/minute in testing (2026-11-02).
+    # Gemini free tier, per model (AI Studio, 2026-11-02): Flash 5 req/min and 20 req/day; Flash Lite 15 req/min.
     "gemini": Provider("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", 13.0),
     "groq": Provider("https://api.groq.com/openai/v1", "GROQ_API_KEY", 2.5),
     "cerebras": Provider("https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", 2.5),
@@ -36,7 +36,10 @@ PROVIDERS = {
     "openrouter": Provider("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", 4.0),
 }
 
-# Last request time per provider, shared by every agent in the process (evals create many).
+# Free-tier limits are per model; these models allow more requests per minute than their provider's default.
+MODEL_MIN_SECONDS = {"gemini-3.1-flash-lite": 4.5}
+
+# Last request time per provider and model, shared by every agent in the process (evals create many).
 _last_call: dict[str, float] = {}
 
 OPENAI_TOOLS = [
@@ -75,11 +78,12 @@ class CompatAgent(BaseAgent):
         self.messages.append({"role": "user", "content": f"[Store system note, not from the customer] {text}"})
 
     def _call(self, reply: Reply) -> Step:
-        last = _last_call.get(self.provider_name, float("-inf"))
-        wait = self.provider.min_seconds_between_calls - (time.monotonic() - last)
+        key = f"{self.provider_name}:{self.model}"
+        spacing = MODEL_MIN_SECONDS.get(self.model, self.provider.min_seconds_between_calls)
+        wait = spacing - (time.monotonic() - _last_call.get(key, float("-inf")))
         if wait > 0:
             time.sleep(wait)
-        _last_call[self.provider_name] = time.monotonic()
+        _last_call[key] = time.monotonic()
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": self.system}, *self.messages],
