@@ -1,5 +1,7 @@
 # Empório da Música: customer-service agent
 
+[![tests](https://github.com/rlbuff7/emporio-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/rlbuff7/emporio-agent/actions/workflows/tests.yml)
+
 A text-chat agent for Empório da Música, a fictional musical-instrument store in Campo Grande/MS.
 It answers customers in Brazilian Portuguese. It looks up products, prices, promotions and orders
 in the store's data, applies the store's policy manual, opens a ticket for the human team when a
@@ -276,3 +278,11 @@ I used Claude Code as a pair programmer, and the process went like this.
 5. How I checked its work: I read the diffs, used the CLI myself (my sessions found four of the
    problems in the testing log), read the transcripts, and kept `pytest` green on every commit. I
    also held it to one rule: every claim in these docs had to come from a test or a measurement.
+
+---
+
+## License
+
+The code, tests, evals and documentation are under the MIT license (see [`LICENSE`](LICENSE)). The
+challenge material in `data/raw/` (the store's CSVs and policy manual) and its conversion in
+`data/policies.md` were provided by Artefact and are not covered by it.

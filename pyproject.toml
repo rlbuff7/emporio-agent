@@ -7,6 +7,7 @@ name = "emporio-agent"
 version = "0.1.0"
 description = "Customer-service agent for Empório da Música (Artefact AI Engineer challenge)"
 requires-python = ">=3.11"
+license = { text = "MIT (code only; see LICENSE for the challenge data)" }
 dependencies = [
     "anthropic>=2.3",
 ]
@@ -20,3 +21,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # tests share helpers via "from tests.test_agent import ..."; works with plain `pytest`
