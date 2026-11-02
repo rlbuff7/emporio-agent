@@ -115,11 +115,19 @@ The tools:
 
 ## Technical decisions
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/model_comparison_dark.svg">
+  <img alt="Bar charts comparing four models on the eval suite: Claude Haiku 5.5 passed 19 of 19 at 2.9 s per reply for US$ 0.03; Claude Sonnet 5.5 passed 18 of 18 at 4.3 s for US$ 0.56; Groq gpt-oss-120b passed 12 of 16 at 30.5 s, free; Groq gpt-oss-20b passed 9 of 13 at 64.1 s, free" src="docs/model_comparison_light.svg">
+</picture>
+
+The chart comes from the live eval runs (`python evals/plot_comparison.py` redraws it). Gemini is
+left out because its free quota ran out after one scenario; see [`docs/model_choice.md`](docs/model_choice.md).
+
 | Decision | Choice | Why |
 |---|---|---|
 | Agent approach | Function calling for data; the whole manual in the system prompt for policies | Prices, stock and orders are tabular and need exact queries. The manual is about 8 pages (~4k tokens), so it fits in context, and retrieval would only add a way to fail (a missed chunk). If the manual grew, I'd move to RAG with one chunk per numbered section. |
 | Framework | None, just a small loop on the Anthropic SDK | Everything sent to the model and everything that comes back passes through one place, which makes it easy to read and debug. A framework would hide exactly the parts the challenge is evaluating. |
-| Model | `claude-haiku-5-5` | I picked it after running 19 graded scenarios. Haiku 5.5 passed all 19 at 2.9 s per reply and about US$ 0.03 per run. Sonnet 5.5 also passed everything on the earlier 18-scenario suite, but it was slower and cost about 25 times more. The free models (Groq `gpt-oss`, Gemini Flash) missed facts customers ask for, and rate limits slowed them to 6 to 130 s per reply. Details in [`docs/model_choice.md`](docs/model_choice.md). |
+| Model | `claude-haiku-5-5` | I picked it after running 19 graded scenarios. Haiku 5.5 passed all 19 at 2.9 s per reply and about US$ 0.03 per run. Sonnet 5.5 also passed everything on the earlier 18-scenario suite, but it was slower and cost about 25 times more. The free Groq `gpt-oss` models missed facts customers ask for and took 30 to 64 s per reply under rate limits; Gemini's free quota ran out after one scenario. Details in [`docs/model_choice.md`](docs/model_choice.md). |
 | Where numbers come from | Code only | The model never computes a price, discount, installment or deadline. The tools return final values, and the output guardrail rejects any `R$` amount that didn't come from a tool. |
 | Database | SQLite built from the CSVs | No infrastructure, real SQL, rebuilt with one command. The tools open it read-only. |
 | Interface | CLI | The challenge is about the agent. `--debug` prints every tool call, so you can check where each answer came from. |

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="256" viewBox="0 0 820 256" role="img" aria-labelledby="title desc">
+<title id="title">Model comparison on the eval suite</title>
+<desc id="desc">Claude Haiku 5.5: 19 of 19 passed, 2.9 s per reply, US$ 0.03 per eval run; Claude Sonnet 5.5: 18 of 18 passed, 4.3 s per reply, US$ 0.56 per eval run; Groq gpt-oss-120b: 12 of 16 passed, 30.5 s per reply, free per eval run; Groq gpt-oss-20b: 9 of 13 passed, 64.1 s per reply, free per eval run</desc>
+<rect width="820" height="256" fill="#fcfcfb"/>
+<text x="0" y="22" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#0b0b0b">Same tools and guardrails, different models</text>
+<text x="150" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">Scenarios passed</text>
+<text x="150" y="65" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">of those that ran</text>
+<line x1="150" y1="70" x2="150" y2="202" stroke="#c3c2b7" stroke-width="1"/>
+<path d="M150.0,74.0 h132.0 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.0 z" fill="#2a78d6"/>
+<text x="292.0" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">19/19</text>
+<path d="M150.0,108.0 h132.0 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.0 z" fill="#898781"/>
+<text x="292.0" y="120" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">18/18</text>
+<path d="M150.0,142.0 h98.0 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-98.0 z" fill="#898781"/>
+<text x="258.0" y="154" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">12/16</text>
+<path d="M150.0,176.0 h90.2 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-90.2 z" fill="#898781"/>
+<text x="250.2" y="188" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">9/13</text>
+<text x="374" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">Seconds per reply</text>
+<text x="374" y="65" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">lower is better</text>
+<line x1="374" y1="70" x2="374" y2="202" stroke="#c3c2b7" stroke-width="1"/>
+<path d="M374.0,74.0 h2.1 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-2.1 z" fill="#2a78d6"/>
+<text x="386.1" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">2.9 s</text>
+<path d="M374.0,108.0 h5.2 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-5.2 z" fill="#898781"/>
+<text x="389.2" y="120" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">4.3 s</text>
+<path d="M374.0,142.0 h60.7 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-60.7 z" fill="#898781"/>
+<text x="444.7" y="154" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">30.5 s</text>
+<path d="M374.0,176.0 h132.0 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.0 z" fill="#898781"/>
+<text x="516.0" y="188" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">64.1 s</text>
+<text x="598" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">Cost of one eval run</text>
+<text x="598" y="65" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">US$, lower is better</text>
+<line x1="598" y1="70" x2="598" y2="202" stroke="#c3c2b7" stroke-width="1"/>
+<path d="M598.0,74.0 h3.7 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-3.7 z" fill="#2a78d6"/>
+<text x="611.7" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">US$ 0.03</text>
+<path d="M598.0,108.0 h132.0 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-132.0 z" fill="#898781"/>
+<text x="740.0" y="120" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">US$ 0.56</text>
+
+<text x="604.0" y="154" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">free</text>
+
+<text x="604.0" y="188" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">free</text>
+<text x="0" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#0b0b0b">Claude Haiku 5.5</text>
+<text x="0" y="120" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="400" fill="#0b0b0b">Claude Sonnet 5.5</text>
+<text x="0" y="154" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="400" fill="#0b0b0b">Groq gpt-oss-120b</text>
+<text x="0" y="188" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" font-weight="400" fill="#0b0b0b">Groq gpt-oss-20b</text>
+<text x="0" y="242" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">One run each, 2026-11-02. Groq ran on its free tier; scenarios cut off by rate limits are excluded. Haiku: 19 scenarios; Sonnet: earlier 18-scenario suite.</text>
+</svg>

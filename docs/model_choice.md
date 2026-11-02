@@ -32,12 +32,20 @@ reference.
 
 ## Results (2026-11-02, one run each)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="model_comparison_dark.svg">
+  <img alt="Bar charts comparing four models: scenarios passed, seconds per reply and cost of one eval run" src="model_comparison_light.svg">
+</picture>
+
+The chart is drawn from `evals/results/` by `python evals/plot_comparison.py`. Times count only the
+scenarios that ran to the end.
+
 | Model | Provider / tier | Passed | Avg. time per message | Cost of the suite | Notes |
 |---|---|---|---|---|---|
 | `claude-haiku-5-5` | Anthropic, paid | 19 / 19 | 2.9 s | ~US$ 0.03 | Re-run after all prompt fixes |
 | `claude-sonnet-5-5` | Anthropic, paid | 18 / 18 | 4.3 s | ~US$ 0.56 | Earlier 18-scenario suite. Same score as Haiku at about 25 times the cost |
-| `gpt-oss-20b` | Groq, free | 9 / 13 that ran | 55 s | free | 5 scenarios hit the 8k-tokens-per-minute limit (one ~6k-token request a minute). Missed the prices when asked to add two, the tracking code, the address and an expired-promotion price |
-| `gpt-oss-120b` | Groq, free | 12 / 16 that ran | 30 to 130 s | free | 9 of 10 adversarial. Missed "18%", the tracking code, the address and "7 dias". A tool-schema error stopped the run; it's fixed now (finding 5 in `docs/testing.md`) |
+| `gpt-oss-20b` | Groq, free | 9 / 13 that ran | 64 s | free | 5 scenarios hit the 8k-tokens-per-minute limit (one ~6k-token request a minute). Missed the prices when asked to add two, the tracking code, the address and an expired-promotion price |
+| `gpt-oss-120b` | Groq, free | 12 / 16 that ran | 31 s | free | 8 of 9 adversarial. Missed "18%", the tracking code, the address and "7 dias". A tool-schema error stopped the run; it's fixed now (finding 5 in `docs/testing.md`) |
 | `gemini-3.5-flash` | Google, free | 1 / 1 that ran | 12 s | free | Passed the catalog scenario, then the free tier refused further requests: 20 a day per model, 5 a minute |
 | `gemini-3.1-flash-lite` | Google, free | 1 / 1 that ran | 6.4 s | free | Allows 15 requests a minute; chosen as the first fallback |
 
@@ -52,12 +60,12 @@ Haiku got right everything this agent has to get right: tool use, exact prices, 
 the refusals. The free models missed things customers actually ask for, like a tracking code, the
 store's address or a promotion percentage.
 
-It is also fast, at about 3 s per reply. The free tiers took 6 to 130 s, mostly waiting on rate
+It is also fast, at about 3 s per reply. The free Groq models took 30 to 64 s, mostly waiting on rate
 limits, which is too slow for a chat. And it costs about US$ 0.001 per customer message.
 
 The guardrails don't depend on the model. Identity checks, price validation and the lockout run in
 code, so even a weaker fallback model can't leak data or invent a price. That shows in the free
-models' adversarial scores (9 of 10 for the 120b model).
+models' adversarial scores (8 of 9 for the 120b model, 6 of 7 for the 20b).
 
 ## Why a fallback chain instead of model rotation
 
