@@ -42,6 +42,11 @@ class Reply:
     text: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)  # guardrail events, shown in --debug
+    usage: dict[str, int] = field(default_factory=dict)  # tokens summed over the turn's API calls
+
+    def add_usage(self, usage) -> None:
+        for name in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+            self.usage[name] = self.usage.get(name, 0) + (getattr(usage, name, 0) or 0)
 
 
 class Agent:
@@ -102,6 +107,7 @@ class Agent:
                 output_config={"effort": self.effort},
                 cache_control={"type": "ephemeral"},  # system prompt + tools are static
             )
+            reply.add_usage(getattr(response, "usage", None))
             if response.stop_reason == "refusal":
                 return self._give_up(reply)
             self.messages.append({"role": "assistant", "content": response.content})
