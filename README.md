@@ -117,11 +117,12 @@ The tools:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/model_comparison_dark.svg">
-  <img alt="Bar charts comparing four models on the eval suite: Claude Haiku 5.5 passed 19 of 19 at 2.9 s per reply for US$ 0.03; Claude Sonnet 5.5 passed 18 of 18 at 4.3 s for US$ 0.56; Groq gpt-oss-120b passed 12 of 16 at 30.5 s, free; Groq gpt-oss-20b passed 9 of 13 at 64.1 s, free" src="docs/model_comparison_light.svg">
+  <img alt="Bar charts comparing six models on the eval suite: Claude Haiku 5.5 passed 19 of 19 at 2.9 s per reply for US$ 0.03; Claude Sonnet 5.5 passed 18 of 18 at 4.3 s for US$ 0.56; Groq gpt-oss-120b passed 12 of 16 at 30.5 s, free; Groq gpt-oss-20b passed 9 of 13 at 64.1 s, free; Gemini 3.5 Flash and 3.1 Flash Lite each passed the only scenario that ran before their free quota ran out" src="docs/model_comparison_light.svg">
 </picture>
 
-The chart comes from the live eval runs (`python evals/plot_comparison.py` redraws it). Gemini is
-left out because its free quota ran out after one scenario; see [`docs/model_choice.md`](docs/model_choice.md).
+The chart comes from the live eval runs (`python evals/plot_comparison.py` redraws it). The Gemini
+bars are outlined because their free quota ran out after one scenario, so they can't be compared
+with the others; see [`docs/model_choice.md`](docs/model_choice.md).
 
 | Decision | Choice | Why |
 |---|---|---|

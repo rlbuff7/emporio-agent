@@ -8,8 +8,8 @@ picks one by the reader's theme). Standard library only.
 Three panels share the model rows: scenarios passed, seconds per reply, and cost of one
 full eval run. They are separate panels because the three measures have different units.
 Scenarios that hit a free-tier rate limit are excluded from that model's counts, not
-scored as failures. Gemini is left out: only one scenario ran before its free quota ran
-out, which is too few to plot.
+scored as failures. The Gemini rows are drawn as outlined bars: only one scenario ran
+before their free quota ran out, so their numbers are not comparable with the others.
 """
 
 import json
@@ -20,11 +20,13 @@ RESULTS = Path(__file__).parent / "results"
 DOCS = Path(__file__).parent.parent / "docs"
 
 MODELS = [
-    # (label, results file, chosen?)
-    ("Claude Haiku 5.5", "claude-haiku-5-5.json", True),
-    ("Claude Sonnet 5.5", "claude-sonnet-5-5.json", False),
-    ("Groq gpt-oss-120b", None, False),
-    ("Groq gpt-oss-20b", "groq__openai_gpt-oss-20b.json", False),
+    # (label, results file, chosen?, too few scenarios ran to compare?)
+    ("Claude Haiku 5.5", "claude-haiku-5-5.json", True, False),
+    ("Claude Sonnet 5.5", "claude-sonnet-5-5.json", False, False),
+    ("Groq gpt-oss-120b", None, False, False),
+    ("Groq gpt-oss-20b", "groq__openai_gpt-oss-20b.json", False, False),
+    ("Gemini 3.5 Flash", "gemini__gemini-3.5-flash.json", False, True),
+    ("Gemini 3.1 Flash Lite", "gemini__gemini-3.1-flash-lite.json", False, True),
 ]
 
 # The gpt-oss-120b run crashed before saving its JSON (see docs/testing.md, finding 5).
@@ -53,9 +55,9 @@ def summarize(filename: str) -> dict:
 
 def rows() -> list[dict]:
     out = []
-    for label, filename, chosen in MODELS:
+    for label, filename, chosen, partial in MODELS:
         stats = summarize(filename) if filename else GPT_OSS_120B
-        out.append({"label": label, "chosen": chosen, **stats})
+        out.append({"label": label, "chosen": chosen, "partial": partial, **stats})
     return out
 
 
@@ -63,19 +65,22 @@ def cost_text(d: dict) -> str:
     return "free" if d["cost"] == 0 else f'US$ {d["cost"]:.2f}'
 
 
-def bar(x: float, y: float, length: float, height: float, color: str) -> str:
-    """Horizontal bar anchored at x, with only its data end rounded (4px)."""
+def bar(x: float, y: float, length: float, height: float, color: str, outlined: bool = False) -> str:
+    """Horizontal bar anchored at x, with only its data end rounded (4px).
+    Outlined (dashed, no fill) marks a result based on too few scenarios to compare."""
     if length <= 0:
         return ""
     r = min(4.0, length, height / 2)
+    paint = (f'fill="none" stroke="{color}" stroke-width="1.5" stroke-dasharray="4 3"'
+             if outlined else f'fill="{color}"')
     return (f'<path d="M{x:.1f},{y:.1f} h{length - r:.1f} a{r},{r} 0 0 1 {r},{r} '
-            f'v{height - 2 * r:.1f} a{r},{r} 0 0 1 {-r},{r} h{-(length - r):.1f} z" fill="{color}"/>')
+            f'v{height - 2 * r:.1f} a{r},{r} 0 0 1 {-r},{r} h{-(length - r):.1f} z" {paint}/>')
 
 
 def render(data: list[dict], theme: dict) -> str:
     width, label_w, panel_w, gap = 820, 150, 200, 24
     top, row_h, bar_h = 74, 34, 14
-    height = top + row_h * len(data) + 46
+    height = top + row_h * len(data) + 58
     panels = [
         ("Scenarios passed", "of those that ran", lambda d: d["passed"] / d["ran"], 1.0,
          lambda d: f'{d["passed"]}/{d["ran"]}'),
@@ -108,17 +113,21 @@ def render(data: list[dict], theme: dict) -> str:
             y = top + j * row_h
             length = bar_max * value(d) / scale if scale else 0
             color = theme["chosen"] if d["chosen"] else theme["other"]
-            svg.append(bar(px, y, length, bar_h, color))
+            svg.append(bar(px, y, length, bar_h, color, outlined=d["partial"]))
             svg.append(f'<text x="{px + length + 6:.1f}" y="{y + bar_h - 2}" {font} font-size="12" '
                        f'fill="{theme["ink2"]}">{text(d)}</text>')
     for j, d in enumerate(data):
         y = top + j * row_h + bar_h - 2
         weight = "600" if d["chosen"] else "400"
         svg.append(f'<text x="0" y="{y}" {font} font-size="12" font-weight="{weight}" '
-                   f'fill="{theme["ink"]}">{escape(d["label"])}</text>')
-    svg.append(f'<text x="0" y="{height - 14}" {font} font-size="11" fill="{theme["muted"]}">'
-               'One run each, 2026-11-02. Groq ran on its free tier; scenarios cut off by rate limits are '
-               'excluded. Haiku: 19 scenarios; Sonnet: earlier 18-scenario suite.</text>')
+                   f'fill="{theme["ink"]}">{escape(d["label"])}{"*" if d["partial"] else ""}</text>')
+    notes = [
+        "One run each, 2026-11-02. Haiku: 19 scenarios; Sonnet: earlier 18-scenario suite. Groq and Gemini on free tiers;",
+        "scenarios cut off by rate limits are excluded. * Outlined bars: Gemini's free quota (20 requests/day) ran out after one scenario.",
+    ]
+    for k, note in enumerate(notes):
+        svg.append(f'<text x="0" y="{height - 30 + 15 * k}" {font} font-size="11" fill="{theme["muted"]}">'
+                   f'{escape(note)}</text>')
     svg.append("</svg>")
     return "\n".join(svg)
 

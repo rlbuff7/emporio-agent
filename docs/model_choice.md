@@ -34,11 +34,11 @@ reference.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="model_comparison_dark.svg">
-  <img alt="Bar charts comparing four models: scenarios passed, seconds per reply and cost of one eval run" src="model_comparison_light.svg">
+  <img alt="Bar charts comparing six models: scenarios passed, seconds per reply and cost of one eval run" src="model_comparison_light.svg">
 </picture>
 
 The chart is drawn from `evals/results/` by `python evals/plot_comparison.py`. Times count only the
-scenarios that ran to the end.
+scenarios that ran to the end. The Gemini bars are outlined because only one scenario ran.
 
 | Model | Provider / tier | Passed | Avg. time per message | Cost of the suite | Notes |
 |---|---|---|---|---|---|
