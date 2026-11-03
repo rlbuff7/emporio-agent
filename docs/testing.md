@@ -5,7 +5,7 @@ three levels, plus an external review by a software engineer before submission:
 
 | Level | What | How to run | Cost |
 |---|---|---|---|
-| Unit and integration | 122 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
+| Unit and integration | 125 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
 | Live evals | 19 scripted conversations (8 functional, 11 adversarial) graded in code | `python evals/run_evals.py <model>` | ~US$ 0.03 per run on Haiku |
 | Manual | A person chatting with the CLI, looking for anything that reads wrong to a customer | `python -m emporio.chat --debug --save <file>.md` | ~US$ 0.001 per message on Haiku |
 

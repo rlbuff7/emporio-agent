@@ -10,8 +10,9 @@ decision isn't its to make, and turns down anything outside the store's scope.
 I built it for the Artefact AI Engineer technical challenge in Python, with the Anthropic SDK called
 directly (no agent framework), SQLite and a command-line chat.
 
-An excerpt from [`examples/02_price_promotion_pix.md`](examples/02_price_promotion_pix.md), run with
-`--debug` so the tool call and its result show up before the reply:
+An excerpt from [`examples/02_price_promotion_pix.md`](examples/02_price_promotion_pix.md), recorded in the tester view
+(`--debug`), so the tool call and its result show up before the reply. A customer sees only the reply;
+see [Customer view and tester view](#customer-view-and-tester-view).
 
 ```text
 Você: Quanto custa o Crafter HT-100? Tem desconto no PIX?
@@ -49,13 +50,38 @@ pip install -e ".[dev]"
 cp .env.example .env              # then set ANTHROPIC_API_KEY in .env
 
 python -m emporio.etl             # builds data/emporio.db from the CSVs (the chat also does this if missing)
-python -m emporio.chat            # talk to the agent
-python -m emporio.chat --debug    # ...and see every tool call, its result and guardrail events
-pytest                            # 122 offline tests, no API key needed
+python -m emporio.chat            # the chat as a customer sees it
+python -m emporio.chat --debug    # tester view: also prints tool calls, results and guardrail events
+pytest                            # 125 offline tests, no API key needed
 ```
 
 Inside the chat, `/reset` starts a new conversation and `/sair` quits. `--save file.md` writes the
 transcript to Markdown on exit, which is how the files in `examples/` were made.
+
+### Customer view and tester view
+
+`python -m emporio.chat` is what a customer would see. While the agent works, a "Empório da Música
+está digitando..." line appears, and then the reply is typed out:
+
+```text
+Você: Quanto custa o Crafter HT-100? Tem desconto no PIX?
+Empório da Música: O Crafter HT-100 Folk Aço Natural está em promoção "Desconto Exclusivo":
+
+- Preço original: R$ 2.399,00
+- Desconto: 18%
+- Preço final: R$ 1.967,18
+- Parcelamento: até 12x de R$ 163,93 sem juros
+...
+```
+
+`--debug` is only for whoever is testing or reviewing the agent. It adds the lines a customer
+never sees: each tool call with its arguments and result, and any guardrail event (an injection
+reminder, a rejected reply, a fallback to another provider). The excerpt at the top of this README
+and the files in `examples/` were recorded in this mode on purpose, to show where every answer
+came from. In a real channel such as WhatsApp, only the customer view would exist.
+
+The typing effect runs after the whole reply has passed the output guardrail. Streaming tokens
+straight from the API would show the customer text before that check, so the agent doesn't stream.
 
 If you don't have an Anthropic key, `pytest` and the transcripts in `examples/` need no key at all.
 You can also chat with the agent on a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey),
@@ -214,7 +240,7 @@ called.
 
 There are three levels, and [`docs/testing.md`](docs/testing.md) records what each one found.
 
-1. `pytest` runs 122 offline tests with no key and no network. They cover the ETL, every
+1. `pytest` runs 125 offline tests with no key and no network. They cover the ETL, every
    data-quality finding, every tool rule (pricing, PIX, installments, LGPD, lockout, return windows,
    opening hours and the 2026 holiday calendar), the agent loop with scripted fake clients, both
    adapters, the fallback and the guardrails.

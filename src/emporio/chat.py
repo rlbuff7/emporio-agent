@@ -14,6 +14,7 @@ import re
 import shutil
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 import anthropic
@@ -107,6 +108,37 @@ def store_reply(text: str, colors: Colors, width: int | None = None) -> str:
     return wrapped.replace(STORE, colors.paint(STORE, "store"), 1)
 
 
+TYPING_NOTE = "Empório da Música está digitando..."
+MAX_TYPING_SECONDS = 1.5  # long replies type faster, so none takes longer than this
+CHAR_DELAY = 0.012
+
+
+def type_out(text: str, live: bool, write=None, flush=None, sleep=time.sleep) -> None:
+    """Print a reply. On a live terminal it is typed out a character at a time.
+
+    This runs after the reply is complete and has passed the output guardrail; streaming tokens
+    straight from the API would show the customer text before that check.
+    """
+    write = write or sys.stdout.write
+    flush = flush or sys.stdout.flush
+    if not live:
+        write(text + "\n")
+        return
+    delay = min(CHAR_DELAY, MAX_TYPING_SECONDS / max(len(text), 1))
+    i = 0
+    while i < len(text):
+        if text[i] == "\033":  # write a color code whole, never split
+            end = text.index("m", i) + 1
+            write(text[i:end])
+            i = end
+            continue
+        write(text[i])
+        flush()
+        sleep(delay)
+        i += 1
+    write("\n")
+
+
 def debug_lines(lines: list[str], colors: Colors) -> str:
     return "\n".join(colors.paint(line, "guardrail" if "[guardrail]" in line else "tool") for line in lines)
 
@@ -139,6 +171,7 @@ def main() -> None:
     except ProviderError as exc:
         sys.exit(str(exc))
     colors = Colors.for_stdout()
+    live = sys.stdout.isatty()  # typing indicator and typing effect only on a real terminal
     turns: list[tuple[str, str, list[str]]] = []
     print(GREETING.replace(STORE, colors.paint(STORE, "store"), 1))
     print(colors.paint("(comandos: /reset para recomeçar, /sair para encerrar)", "info") + "\n")
@@ -157,8 +190,14 @@ def main() -> None:
                 turns.clear()
                 print(colors.paint("(nova conversa)", "info") + "\n")
                 continue
+            if live:
+                print(colors.paint(TYPING_NOTE, "info"), end="", flush=True)
             try:
-                reply = agent.send(user)
+                try:
+                    reply = agent.send(user)
+                finally:
+                    if live:  # erase the typing indicator before any reply or error is printed
+                        print("\r" + " " * len(TYPING_NOTE) + "\r", end="", flush=True)
             except anthropic.AuthenticationError:
                 sys.exit("Invalid API key. Check ANTHROPIC_API_KEY in .env.")
             except TypeError as exc:
@@ -177,7 +216,8 @@ def main() -> None:
             tool_lines = format_tool_calls(reply)
             if args.debug and tool_lines:
                 print(debug_lines(tool_lines, colors))
-            print(store_reply(reply.text, colors) + "\n")
+            type_out(store_reply(reply.text, colors), live)
+            print()
             turns.append((user, reply.text, tool_lines))
     except KeyboardInterrupt:
         print()

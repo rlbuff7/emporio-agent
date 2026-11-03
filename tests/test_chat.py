@@ -1,4 +1,29 @@
-from emporio.chat import Colors, debug_lines, for_terminal, store_reply
+from emporio.chat import MAX_TYPING_SECONDS, Colors, debug_lines, for_terminal, store_reply, type_out
+
+
+def run_type_out(text, live):
+    out, sleeps = [], []
+    type_out(text, live, write=out.append, flush=lambda: None, sleep=sleeps.append)
+    return "".join(out), sleeps
+
+
+def test_typing_effect_prints_the_same_text():
+    text = store_reply("Oi! Tudo bem?", Colors(True), width=80)
+    printed, sleeps = run_type_out(text, live=True)
+    assert printed == text + "\n"
+    assert sleeps  # typed, not dumped
+
+
+def test_typing_never_splits_a_color_code_and_has_a_time_cap():
+    text = "\033[1;34mEmpório da Música:\033[0m " + "x" * 2000
+    printed, sleeps = run_type_out(text, live=True)
+    assert printed == text + "\n"
+    assert sum(sleeps) <= MAX_TYPING_SECONDS + 1e-6
+
+
+def test_no_typing_when_not_a_terminal():
+    printed, sleeps = run_type_out("Oi!", live=False)
+    assert (printed, sleeps) == ("Oi!\n", [])
 
 
 def test_colors_off_leave_text_plain():
