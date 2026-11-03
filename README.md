@@ -51,7 +51,7 @@ cp .env.example .env              # then set ANTHROPIC_API_KEY in .env
 python -m emporio.etl             # builds data/emporio.db from the CSVs (the chat also does this if missing)
 python -m emporio.chat            # talk to the agent
 python -m emporio.chat --debug    # ...and see every tool call, its result and guardrail events
-pytest                            # 118 offline tests, no API key needed
+pytest                            # 122 offline tests, no API key needed
 ```
 
 Inside the chat, `/reset` starts a new conversation and `/sair` quits. `--save file.md` writes the
@@ -130,7 +130,7 @@ The tools:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/model_comparison_dark.svg">
-  <img alt="Bar charts comparing six models on the eval suite: Claude Haiku 5.5 passed 19 of 19 at 2.9 s per reply for US$ 0.03; Claude Sonnet 5.5 passed 18 of 18 at 4.3 s for US$ 0.56; Groq gpt-oss-120b passed 12 of 16 at 30.5 s, free; Groq gpt-oss-20b passed 9 of 13 at 64.1 s, free; Gemini 3.5 Flash and 3.1 Flash Lite each passed the only scenario that ran before their free quota ran out" src="docs/model_comparison_light.svg">
+  <img alt="Bar charts comparing six models on the eval suite: Claude Haiku 5.5 passed 19 of 19 at 3.1 s per reply for US$ 0.03; Claude Sonnet 5.5 passed 18 of 18 at 4.3 s for US$ 0.56; Groq gpt-oss-120b passed 12 of 16 at 30.5 s, free; Groq gpt-oss-20b passed 9 of 13 at 64.1 s, free; Gemini 3.5 Flash and 3.1 Flash Lite each passed the only scenario that ran before their free quota ran out" src="docs/model_comparison_light.svg">
 </picture>
 
 The chart comes from the live eval runs (`python evals/plot_comparison.py` redraws it). The Gemini
@@ -141,7 +141,7 @@ with the others; see [`docs/model_choice.md`](docs/model_choice.md).
 |---|---|---|
 | Agent approach | Function calling for data; the whole manual in the system prompt for policies | Prices, stock and orders are tabular and need exact queries. The manual is about 8 pages (~4k tokens), so it fits in context, and retrieval would only add a way to fail (a missed chunk). If the manual grew, I'd move to RAG with one chunk per numbered section. |
 | Framework | None, just a small loop on the Anthropic SDK | Everything sent to the model and everything that comes back passes through one place, which makes it easy to read and debug. A framework would hide exactly the parts the challenge is evaluating. |
-| Model | `claude-haiku-5-5` | I picked it after running 19 graded scenarios. Haiku 5.5 passed all 19 at 2.9 s per reply and about US$ 0.03 per run. Sonnet 5.5 also passed everything on the earlier 18-scenario suite, but it was slower and cost about 25 times more. The free Groq `gpt-oss` models missed facts customers ask for and took 30 to 64 s per reply under rate limits; Gemini's free quota ran out after one scenario. Details in [`docs/model_choice.md`](docs/model_choice.md). |
+| Model | `claude-haiku-5-5` | I picked it after running 19 graded scenarios. Haiku 5.5 passed all 19 at 3.1 s per reply and about US$ 0.03 per run. Sonnet 5.5 also passed everything on the earlier 18-scenario suite, but it was slower and cost about 25 times more. The free Groq `gpt-oss` models missed facts customers ask for and took 30 to 64 s per reply under rate limits; Gemini's free quota ran out after one scenario. Details in [`docs/model_choice.md`](docs/model_choice.md). |
 | Where numbers come from | Code only | The model never computes a price, discount, installment or deadline. The tools return final values, and the output guardrail rejects any `R$` amount that didn't come from a tool. |
 | Database | SQLite built from the CSVs | No infrastructure, real SQL, rebuilt with one command. The tools open it read-only. |
 | Interface | CLI | The challenge is about the agent. `--debug` prints every tool call, so you can check where each answer came from. |
@@ -214,7 +214,7 @@ called.
 
 There are three levels, and [`docs/testing.md`](docs/testing.md) records what each one found.
 
-1. `pytest` runs 118 offline tests with no key and no network. They cover the ETL, every
+1. `pytest` runs 122 offline tests with no key and no network. They cover the ETL, every
    data-quality finding, every tool rule (pricing, PIX, installments, LGPD, lockout, return windows,
    opening hours and the 2026 holiday calendar), the agent loop with scripted fake clients, both
    adapters, the fallback and the guardrails.
@@ -289,6 +289,8 @@ I used Claude Code as a pair programmer, and the process went like this.
 5. How I checked its work: I read the diffs, used the CLI myself (my sessions found four of the
    problems in the testing log), read the transcripts, and kept `pytest` green on every commit. I
    also held it to one rule: every claim in these docs had to come from a test or a measurement.
+   Before submitting, a software engineer reviewed the project; his suggestions (colors in the CLI,
+   closing each reply with a concrete next step) are finding 10 in the testing log.
 
 ---
 

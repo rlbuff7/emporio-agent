@@ -1,11 +1,11 @@
 # Testing log
 
 This is how I tested the agent, and what each round of testing found and changed. There are
-three levels:
+three levels, plus an external review by a software engineer before submission:
 
 | Level | What | How to run | Cost |
 |---|---|---|---|
-| Unit and integration | 118 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
+| Unit and integration | 122 offline tests: ETL, data-quality findings, every tool rule, agent loop with fake clients, adapters, fallback, guardrails, CLI formatting | `pytest` | free, no key |
 | Live evals | 19 scripted conversations (8 functional, 11 adversarial) graded in code | `python evals/run_evals.py <model>` | ~US$ 0.03 per run on Haiku |
 | Manual | A person chatting with the CLI, looking for anything that reads wrong to a customer | `python -m emporio.chat --debug --save <file>.md` | ~US$ 0.001 per message on Haiku |
 
@@ -25,6 +25,8 @@ also became a test or an eval check.
 | 7 | Manual (CLI) | Long product list on Windows | Long reply lines made the input cursor land inside earlier output; `bold` showed as asterisks | CLI wraps replies to the terminal width and strips emphasis (`ca16201`) |
 | 8 | Manual (CLI) | "violões de nylon e normais até R$ 800" | "normais" (ambiguous: steel strings, or no pickup?) was read as "no pickup", without asking | Prompt: ask "de aço ou sem captação?" before searching (`39a0b31`) |
 | 9 | Manual (CLI) | "a loja abre dia 31/12?" | Only knew today's hours, so it offered a ticket instead of answering | `get_opening_hours(date)` tool with national, state and Campo Grande holidays, the full 2026 calendar pinned by a test (`a71105f`, `57bfdc2`) |
+| 10 | External review (a software engineer) | Whole CLI | Everything was white, so it was hard to tell the customer, the store and the debug lines apart. Replies always ended with a generic "anything else?" | Colors in the CLI (`4b64f9e`); replies now close with one concrete next step tied to the question |
+| 11 | Eval review | Expired promotion, product out of stock | The new next-step closing offered to "let you know when it's back in stock", which the store can't do (no notification tool; manual 6.2: no rain check) | Prompt forbids offering notifications, reservations or held prices |
 
 ## Manual test sessions, 2026-11-02
 
@@ -64,7 +66,7 @@ Transcript: [`examples/manual/teste-01.md`](../examples/manual/teste-01.md).
 
 ## Status
 
-All nine findings are fixed. The full eval suite was re-run on Haiku after the last fix
-(`39a0b31`) and passed 19 of 19, including finding 6 (only open windows are offered) and
-finding 9 (hours on a given date, a new scenario). Finding 8 is a prompt rule and has no eval
-scenario yet.
+All findings are fixed. After the external review, the full suite was re-run on Haiku and passed
+19 of 19 (3.1 s per reply); only 1 of 19 replies still closed with a generic question. Reading those
+replies surfaced finding 11, which was fixed in the prompt and checked on Gemini Flash Lite (free).
+Finding 8 is a prompt rule with no eval scenario yet.

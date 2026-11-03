@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="336" viewBox="0 0 820 336" role="img" aria-labelledby="title desc">
 <title id="title">Model comparison on the eval suite</title>
-<desc id="desc">Claude Haiku 5.5: 19 of 19 passed, 2.9 s per reply, US$ 0.03 per eval run; Claude Sonnet 5.5: 18 of 18 passed, 4.3 s per reply, US$ 0.56 per eval run; Groq gpt-oss-120b: 12 of 16 passed, 30.5 s per reply, free per eval run; Groq gpt-oss-20b: 9 of 13 passed, 64.1 s per reply, free per eval run; Gemini 3.5 Flash: 1 of 1 passed, 21.9 s per reply, free per eval run; Gemini 3.1 Flash Lite: 1 of 1 passed, 6.4 s per reply, free per eval run</desc>
+<desc id="desc">Claude Haiku 5.5: 19 of 19 passed, 3.1 s per reply, US$ 0.03 per eval run; Claude Sonnet 5.5: 18 of 18 passed, 4.3 s per reply, US$ 0.56 per eval run; Groq gpt-oss-120b: 12 of 16 passed, 30.5 s per reply, free per eval run; Groq gpt-oss-20b: 9 of 13 passed, 64.1 s per reply, free per eval run; Gemini 3.5 Flash: 1 of 1 passed, 21.9 s per reply, free per eval run; Gemini 3.1 Flash Lite: 1 of 1 passed, 6.4 s per reply, free per eval run</desc>
 <rect width="820" height="336" fill="#fcfcfb"/>
 <text x="0" y="22" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#0b0b0b">Same tools and guardrails, different models</text>
 <text x="150" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">Scenarios passed</text>
@@ -21,8 +21,8 @@
 <text x="374" y="50" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">Seconds per reply</text>
 <text x="374" y="65" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#898781">lower is better</text>
 <line x1="374" y1="70" x2="374" y2="270" stroke="#c3c2b7" stroke-width="1"/>
-<path d="M374.0,74.0 h2.1 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-2.1 z" fill="#2a78d6"/>
-<text x="386.1" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">2.9 s</text>
+<path d="M374.0,74.0 h2.6 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-2.6 z" fill="#2a78d6"/>
+<text x="386.6" y="86" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">3.1 s</text>
 <path d="M374.0,108.0 h5.2 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-5.2 z" fill="#898781"/>
 <text x="389.2" y="120" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#52514e">4.3 s</text>
 <path d="M374.0,142.0 h60.7 a4.0,4.0 0 0 1 4.0,4.0 v6.0 a4.0,4.0 0 0 1 -4.0,4.0 h-60.7 z" fill="#898781"/>

@@ -42,7 +42,7 @@ scenarios that ran to the end. The Gemini bars are outlined because only one sce
 
 | Model | Provider / tier | Passed | Avg. time per message | Cost of the suite | Notes |
 |---|---|---|---|---|---|
-| `claude-haiku-5-5` | Anthropic, paid | 19 / 19 | 2.9 s | ~US$ 0.03 | Re-run after all prompt fixes |
+| `claude-haiku-5-5` | Anthropic, paid | 19 / 19 | 3.1 s | ~US$ 0.03 | Latest run, after all prompt changes |
 | `claude-sonnet-5-5` | Anthropic, paid | 18 / 18 | 4.3 s | ~US$ 0.56 | Earlier 18-scenario suite. Same score as Haiku at about 25 times the cost |
 | `gpt-oss-20b` | Groq, free | 9 / 13 that ran | 64 s | free | 5 scenarios hit the 8k-tokens-per-minute limit (one ~6k-token request a minute). Missed the prices when asked to add two, the tracking code, the address and an expired-promotion price |
 | `gpt-oss-120b` | Groq, free | 12 / 16 that ran | 31 s | free | 8 of 9 adversarial. Missed "18%", the tracking code, the address and "7 dias". A tool-schema error stopped the run; it's fixed now (finding 5 in `docs/testing.md`) |
